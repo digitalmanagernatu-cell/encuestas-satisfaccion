@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Encuesta de Satisfacción – NATU Laboratorios</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    .tab-active { background: #16a34a; color: #fff; }
+    .tab-inactive { background: #f0fdf4; color: #15803d; }
+    .tab-inactive:hover { background: #dcfce7; }
+    .filter-btn-active { background: #16a34a; color: #fff; }
+    .filter-btn-inactive { background: #f0fdf4; color: #374151; border: 1px solid #d1d5db; }
+    .filter-btn-inactive:hover { background: #dcfce7; }
+    .chart-card { transition: box-shadow .2s; }
+    .chart-card:hover { box-shadow: 0 8px 30px rgba(22,163,74,.15); }
+    .loader { border: 4px solid #f3f3f3; border-top: 4px solid #16a34a; border-radius: 50%; width: 48px; height: 48px; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .stat-card { background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<!-- HEADER -->
+<header class="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-30">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
+        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold text-gray-900">NATU Laboratorios</h1>
+        <p class="text-xs text-gray-500">Dashboard de Satisfacción</p>
+      </div>
+    </div>
+    <div id="lastUpdate" class="text-xs text-gray-400"></div>
+  </div>
+</header>
+
+<!-- YEAR TABS -->
+<div class="bg-white border-b border-gray-200">
+  <div class="max-w-7xl mx-auto px-4">
+    <div id="yearTabs" class="flex gap-1 py-2 overflow-x-auto">
+      <!-- populated by JS -->
+    </div>
+  </div>
+</div>
+
+<main class="max-w-7xl mx-auto px-4 py-6">
+
+  <!-- LOADING -->
+  <div id="loadingState" class="flex flex-col items-center justify-center py-24">
+    <div class="loader mb-4"></div>
+    <p class="text-gray-500">Cargando datos del Google Sheet…</p>
+  </div>
+
+  <!-- ERROR -->
+  <div id="errorState" class="hidden">
+    <div class="bg-red-50 border border-red-200 rounded-xl p-6 max-w-2xl mx-auto mt-12">
+      <h2 class="text-red-700 font-semibold text-lg mb-2">No se pudieron cargar los datos</h2>
+      <p class="text-red-600 text-sm mb-4" id="errorMsg"></p>
+      <div class="bg-white rounded-lg p-4 border border-red-100">
+        <p class="text-gray-700 text-sm font-medium mb-2">Para solucionar esto:</p>
+        <ol class="text-gray-600 text-sm space-y-1 list-decimal list-inside">
+          <li>Abre el Google Sheet</li>
+          <li>Haz clic en <strong>Compartir</strong> (arriba a la derecha)</li>
+          <li>Cambia el acceso a <strong>"Cualquier persona con el enlace puede ver"</strong></li>
+          <li>Recarga esta página</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard" class="hidden">
+
+    <!-- STATS ROW -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="statsRow"></div>
+
+    <!-- CHANNEL FILTER -->
+    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+      <p class="text-sm font-semibold text-gray-700 mb-3">Filtrar por Canal</p>
+      <div class="flex flex-wrap gap-2" id="channelFilters"></div>
+    </div>
+
+    <!-- CHARTS GRID -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="chartsGrid"></div>
+
+  </div>
+</main>
+
+<footer class="text-center text-xs text-gray-400 py-6 border-t border-gray-100 mt-8">
+  NATU Laboratorios &mdash; Encuesta de Satisfacción &copy; <span id="footerYear"></span>
+</footer>
+
+<script>
+// ============================================================
+// CONFIG – ajusta los valores aquí
+// ============================================================
+const SHEET_ID = '1bU3eQQt4uNGTOGAI0Nppa8vcMfjMp4e6ey7Bb4LlcLQ';
+
+// Define los años disponibles y el nombre EXACTO de cada hoja en el Sheet
+const YEARS = [
+  { label: '2025', sheetName: '2025' },
+  // Agrega más años aquí:
+  // { label: '2024', sheetName: '2024' },
+  // { label: '2023', sheetName: '2023' },
+];
+
+// Índice de la columna Canal (0 = primera columna después del timestamp, o sea columna B)
+// Si el formulario no tiene timestamp, pon 0.
+const CANAL_COLUMN_INDEX = 1; // columna B (0-based)
+// ============================================================
+
+const COLORS = [
+  '#16a34a','#4ade80','#86efac','#22c55e','#15803d',
+  '#bbf7d0','#6ee7b7','#34d399','#059669','#a7f3d0',
+  '#10b981','#047857','#065f46','#d1fae5','#ecfdf5',
+];
+
+let state = {
+  activeYear: YEARS[0],
+  rawData: [],      // all rows for current year
+  headers: [],
+  activeCanal: 'Todos',
+  charts: {},
+};
+
+// ---- INIT ----
+document.getElementById('footerYear').textContent = new Date().getFullYear();
+renderYearTabs();
+loadYear(YEARS[0]);
+
+function renderYearTabs() {
+  const container = document.getElementById('yearTabs');
+  container.innerHTML = '';
+  YEARS.forEach(y => {
+    const btn = document.createElement('button');
+    btn.textContent = y.label;
+    btn.className = `px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${
+      y.label === state.activeYear.label ? 'tab-active' : 'tab-inactive'
+    }`;
+    btn.onclick = () => { state.activeYear = y; renderYearTabs(); loadYear(y); };
+    container.appendChild(btn);
+  });
+}
+
+async function loadYear(year) {
+  show('loadingState');
+  hide('errorState');
+  hide('dashboard');
+
+  // Destroy old charts
+  Object.values(state.charts).forEach(c => c.destroy());
+  state.charts = {};
+
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(year.sheetName)}`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    // Strip the JSONP wrapper google adds
+    const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
+    parseAndRender(json);
+  } catch(e) {
+    document.getElementById('errorMsg').textContent = e.message;
+    show('errorState');
+    hide('loadingState');
+  }
+}
+
+function parseAndRender(json) {
+  const table = json.table;
+  if (!table || !table.cols || !table.rows) {
+    document.getElementById('errorMsg').textContent = 'El sheet está vacío o el nombre de la hoja no coincide.';
+    show('errorState'); hide('loadingState'); return;
+  }
+
+  // Headers
+  state.headers = table.cols.map(c => c.label || c.id);
+
+  // Rows
+  state.rawData = table.rows.map(r =>
+    r.c.map(cell => (cell && cell.v !== null && cell.v !== undefined) ? String(cell.v) : '')
+  );
+
+  state.activeCanal = 'Todos';
+  renderDashboard();
+
+  const ts = new Date();
+  document.getElementById('lastUpdate').textContent =
+    `Actualizado: ${ts.toLocaleDateString('es-AR')} ${ts.toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'})}`;
+}
+
+function getFilteredData() {
+  if (state.activeCanal === 'Todos') return state.rawData;
+  return state.rawData.filter(row => (row[CANAL_COLUMN_INDEX] || '').trim() === state.activeCanal);
+}
+
+function renderDashboard() {
+  hide('loadingState');
+  hide('errorState');
+
+  renderStats();
+  renderChannelFilters();
+  renderCharts();
+
+  show('dashboard');
+}
+
+function renderStats() {
+  const filtered = getFilteredData();
+  const total = state.rawData.length;
+  const shown = filtered.length;
+
+  // Canal count
+  const canales = uniqueValues(CANAL_COLUMN_INDEX, state.rawData);
+
+  // Question count (skip timestamp col 0 and canal col)
+  const questionCols = state.headers.slice(CANAL_COLUMN_INDEX + 1);
+
+  const stats = [
+    { label: 'Respuestas totales', value: total, icon: '📋' },
+    { label: 'Respuestas filtradas', value: shown, icon: '🔍' },
+    { label: 'Canales', value: canales.length, icon: '🏪' },
+    { label: 'Preguntas', value: questionCols.length, icon: '❓' },
+  ];
+
+  document.getElementById('statsRow').innerHTML = stats.map(s => `
+    <div class="stat-card rounded-xl p-4 border border-green-100">
+      <div class="text-2xl mb-1">${s.icon}</div>
+      <div class="text-2xl font-bold text-green-700">${s.value}</div>
+      <div class="text-xs text-gray-500 mt-1">${s.label}</div>
+    </div>
+  `).join('');
+}
+
+function renderChannelFilters() {
+  const canales = ['Todos', ...uniqueValues(CANAL_COLUMN_INDEX, state.rawData)];
+  const container = document.getElementById('channelFilters');
+  container.innerHTML = '';
+  canales.forEach(canal => {
+    const btn = document.createElement('button');
+    btn.textContent = canal;
+    const count = canal === 'Todos'
+      ? state.rawData.length
+      : state.rawData.filter(r => (r[CANAL_COLUMN_INDEX]||'').trim() === canal).length;
+    btn.textContent = `${canal} (${count})`;
+    btn.className = `px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+      state.activeCanal === canal ? 'filter-btn-active' : 'filter-btn-inactive'
+    }`;
+    btn.onclick = () => {
+      state.activeCanal = canal;
+      // Destroy charts
+      Object.values(state.charts).forEach(c => c.destroy());
+      state.charts = {};
+      renderStats();
+      renderChannelFilters();
+      renderCharts();
+    };
+    container.appendChild(btn);
+  });
+}
+
+function renderCharts() {
+  const grid = document.getElementById('chartsGrid');
+  grid.innerHTML = '';
+
+  const filtered = getFilteredData();
+  // Skip col 0 (timestamp) and col CANAL_COLUMN_INDEX (canal = already a filter)
+  const skipCols = new Set([0, CANAL_COLUMN_INDEX]);
+
+  state.headers.forEach((header, colIdx) => {
+    if (skipCols.has(colIdx)) return;
+    if (!header || header.toLowerCase().includes('timestamp') || header.toLowerCase().includes('marca')) return;
+
+    const values = filtered.map(r => (r[colIdx] || '').trim()).filter(v => v);
+    if (values.length === 0) return;
+
+    const freq = countFrequency(values);
+    const total = values.length;
+
+    // Build card
+    const card = document.createElement('div');
+    card.className = 'chart-card bg-white rounded-xl border border-gray-200 p-5';
+
+    const canvasId = `chart_${colIdx}`;
+    const isScale = isScaleQuestion(Object.keys(freq));
+
+    card.innerHTML = `
+      <h3 class="text-sm font-semibold text-gray-800 mb-1 leading-snug">${header}</h3>
+      <p class="text-xs text-gray-400 mb-4">${total} respuesta${total !== 1 ? 's' : ''}</p>
+      <div class="relative" style="height:220px">
+        <canvas id="${canvasId}"></canvas>
+      </div>
+      <div class="mt-4 space-y-1" id="legend_${colIdx}"></div>
+    `;
+    grid.appendChild(card);
+
+    // Legend
+    const legendEl = card.querySelector(`#legend_${colIdx}`);
+    const sorted = Object.entries(freq).sort((a,b) => b[1]-a[1]);
+    sorted.forEach(([label, count], i) => {
+      const pct = ((count / total) * 100).toFixed(1);
+      const div = document.createElement('div');
+      div.className = 'flex items-center justify-between text-xs';
+      div.innerHTML = `
+        <div class="flex items-center gap-2 truncate flex-1 mr-2">
+          <span class="w-3 h-3 rounded-full flex-shrink-0" style="background:${COLORS[i % COLORS.length]}"></span>
+          <span class="truncate text-gray-700">${label}</span>
+        </div>
+        <span class="font-semibold text-gray-900 flex-shrink-0">${pct}%</span>
+      `;
+      legendEl.appendChild(div);
+
+      // Progress bar
+      const bar = document.createElement('div');
+      bar.className = 'h-1.5 rounded-full bg-gray-100 mb-1';
+      bar.innerHTML = `<div class="h-full rounded-full" style="width:${pct}%;background:${COLORS[i % COLORS.length]}"></div>`;
+      legendEl.appendChild(bar);
+    });
+
+    // Chart
+    const ctx = document.getElementById(canvasId);
+    const labels = sorted.map(([l]) => truncateLabel(l, 30));
+    const data = sorted.map(([,v]) => v);
+    const chartColors = sorted.map((_, i) => COLORS[i % COLORS.length]);
+
+    const chartType = isScale ? 'bar' : (sorted.length <= 5 ? 'doughnut' : 'bar');
+
+    if (chartType === 'doughnut') {
+      state.charts[canvasId] = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data, backgroundColor: chartColors, borderWidth: 2, borderColor: '#fff' }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: {
+            label: ctx => ` ${ctx.label}: ${((ctx.parsed / total)*100).toFixed(1)}% (${ctx.parsed})`
+          }}},
+          cutout: '60%',
+        }
+      });
+    } else {
+      state.charts[canvasId] = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ data, backgroundColor: chartColors, borderRadius: 6, borderSkipped: false }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          indexAxis: sorted.length > 4 ? 'y' : 'x',
+          plugins: { legend: { display: false }, tooltip: { callbacks: {
+            label: ctx => ` ${((ctx.parsed.x || ctx.parsed.y) / total * 100).toFixed(1)}% (${ctx.parsed.x || ctx.parsed.y} resp.)`
+          }}},
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+            y: { grid: { color: '#f3f4f6' }, ticks: { font: { size: 11 } } }
+          }
+        }
+      });
+    }
+  });
+}
+
+// ---- HELPERS ----
+function uniqueValues(colIdx, rows) {
+  return [...new Set(rows.map(r => (r[colIdx] || '').trim()).filter(v => v))];
+}
+
+function countFrequency(values) {
+  return values.reduce((acc, v) => { acc[v] = (acc[v] || 0) + 1; return acc; }, {});
+}
+
+function isScaleQuestion(options) {
+  return options.every(o => /^\d+$/.test(o.trim()));
+}
+
+function truncateLabel(str, max) {
+  return str.length > max ? str.slice(0, max) + '…' : str;
+}
+
+function show(id) { document.getElementById(id).classList.remove('hidden'); }
+function hide(id) { document.getElementById(id).classList.add('hidden'); }
+</script>
+</body>
+</html>
