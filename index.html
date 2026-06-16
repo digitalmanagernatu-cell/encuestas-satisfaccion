@@ -92,10 +92,13 @@
 
   <div id="dashboard" class="hidden">
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="statsRow"></div>
-    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+
+    <!-- Filtro canal: solo visible cuando el año tiene columna de canal con texto -->
+    <div id="canalFilterSection" class="hidden bg-white rounded-xl border border-gray-200 p-4 mb-6">
       <p class="text-sm font-semibold text-gray-700 mb-3">Filtrar por Canal</p>
       <div class="flex flex-wrap gap-2" id="channelFilters"></div>
     </div>
+
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="chartsGrid"></div>
   </div>
 </main>
@@ -110,7 +113,6 @@
 // ============================================================
 const SHEET_ID = '1bU3eQQt4uNGTOGAI0Nppa8vcMfjMp4e6ey7Bb4LlcLQ';
 
-// Años de más reciente a más antiguo — sheetName = nombre exacto de la pestaña en el Sheet
 const YEARS = [
   { label: '2026', sheetName: '2026' },
   { label: '2025', sheetName: '2025' },
@@ -119,8 +121,7 @@ const YEARS = [
   { label: '2022', sheetName: '2022' },
 ];
 
-// Base total de clientes por año (para calcular tasa de respuesta)
-// 2022-2024: solo canal granel
+// Base total de clientes por año
 // 2025: 758 granel + 195 distribución/gran consumo + 3.496 farmacias + otros = 5.788
 // 2026: 746 granel + 261 distribución/gran consumo + 8.726 farmacias = 9.733
 const CLIENT_BASE = {
@@ -211,27 +212,45 @@ function parseAndRender(json, year) {
   document.getElementById('lastUpdate').textContent = `Actualizado: ${ts.toLocaleDateString('es-AR')} ${ts.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}`;
 }
 
+// Devuelve true solo si la columna canal tiene valores de texto (no numéricos)
+// y al menos 2 opciones distintas — es decir, es una columna de canal real
+function hasCanalFilter() {
+  const vals = uniqueValues(CANAL_COLUMN_INDEX, state.rawData);
+  if (vals.length < 2) return false;
+  // Si todos los valores son numéricos, no es una columna de canal
+  return !vals.every(v => /^\d+(\.\d+)?$/.test(v.trim()));
+}
+
 function getFilteredData() {
-  if (state.activeCanal === 'Todos') return state.rawData;
+  if (!hasCanalFilter() || state.activeCanal === 'Todos') return state.rawData;
   return state.rawData.filter(r => (r[CANAL_COLUMN_INDEX]||'').trim() === state.activeCanal);
 }
 
 function renderDashboard() {
   hide('loadingState'); hide('errorState');
+  const canalActivo = hasCanalFilter();
+  // Mostrar u ocultar la sección de filtro canal
+  canalActivo ? show('canalFilterSection') : hide('canalFilterSection');
+  // Si el año no tiene canal, resetear el filtro activo
+  if (!canalActivo) state.activeCanal = 'Todos';
   renderStats(); renderChannelFilters(); renderCharts();
   show('dashboard');
 }
 
 // ---- STATS ----
 function renderStats() {
-  const filtered = getFilteredData();
-  const total    = state.rawData.length;
-  const shown    = filtered.length;
-  const yearKey  = state.activeYear.label;
-  const base     = CLIENT_BASE[yearKey] || null;
+  const filtered  = getFilteredData();
+  const total     = state.rawData.length;
+  const shown     = filtered.length;
+  const yearKey   = state.activeYear.label;
+  const base      = CLIENT_BASE[yearKey] || null;
+  const canalActivo = hasCanalFilter();
+
+  // Columnas a excluir del cálculo de escala
+  const skipCols = new Set([0]);
+  if (canalActivo) skipCols.add(CANAL_COLUMN_INDEX);
 
   let scaleNormSum = 0, scaleCount = 0, maxPossible = 1, highCount = 0;
-  const skipCols = new Set([0, CANAL_COLUMN_INDEX]);
   state.headers.forEach((h, ci) => {
     if (skipCols.has(ci) || !h) return;
     const vals = filtered.map(r => (r[ci]||'').trim()).filter(Boolean);
@@ -252,7 +271,8 @@ function renderStats() {
   const satisfiedP = scaleCount > 0 ? Math.round((highCount / scaleCount) * 100) : null;
   const responseRate = base ? Math.round((total / base) * 100) : null;
 
-  const card4 = state.activeCanal !== 'Todos'
+  // 4ª tarjeta: canal seleccionado (solo si hay filtro real activo), si no → tasa de respuesta
+  const card4 = (canalActivo && state.activeCanal !== 'Todos')
     ? {
         icon: '🏪',
         value: state.activeCanal,
@@ -268,20 +288,14 @@ function renderStats() {
         sub: `${total} de ${base.toLocaleString('es-AR')} clientes`,
         color: responseRate >= 10 ? 'text-green-700' : 'text-amber-600',
       }
-    : {
-        icon: '📋',
-        value: total,
-        label: 'Respuestas totales',
-        sub: yearKey,
-        color: 'text-green-700',
-      };
+    : { icon: '📋', value: total, label: 'Respuestas totales', sub: yearKey, color: 'text-green-700' };
 
   const stats = [
     {
       icon: '📋',
-      value: state.activeCanal !== 'Todos' ? `${shown} / ${total}` : total,
+      value: (canalActivo && state.activeCanal !== 'Todos') ? `${shown} / ${total}` : total,
       label: 'Respuestas',
-      sub: state.activeCanal !== 'Todos' ? 'filtradas / total' : `año ${yearKey}`,
+      sub: (canalActivo && state.activeCanal !== 'Todos') ? 'filtradas / total' : `año ${yearKey}`,
       color: 'text-green-700',
     },
     {
@@ -313,6 +327,7 @@ function renderStats() {
 
 // ---- FILTERS ----
 function renderChannelFilters() {
+  if (!hasCanalFilter()) return;
   const canales = ['Todos', ...uniqueValues(CANAL_COLUMN_INDEX, state.rawData)];
   const container = document.getElementById('channelFilters');
   container.innerHTML = '';
@@ -338,8 +353,12 @@ function renderCharts() {
   grid.innerHTML = '';
   openAnswers = {};
 
-  const filtered = getFilteredData();
-  const skipCols = new Set([0, CANAL_COLUMN_INDEX]);
+  const filtered    = getFilteredData();
+  const canalActivo = hasCanalFilter();
+
+  // Solo excluir columna canal si realmente ES una columna de canal
+  const skipCols = new Set([0]);
+  if (canalActivo) skipCols.add(CANAL_COLUMN_INDEX);
 
   state.headers.forEach((header, colIdx) => {
     if (skipCols.has(colIdx) || !header) return;
@@ -365,7 +384,6 @@ function renderCharts() {
 // ---- OPEN-ENDED CARD ----
 function renderOpenEndedCard(grid, header, colIdx, values, sorted, total) {
   openAnswers[colIdx] = values;
-
   const repeated = sorted.filter(([,c]) => c > 1);
   const unique   = sorted.filter(([,c]) => c === 1).map(([l]) => l);
   const preview  = [
@@ -431,9 +449,7 @@ function renderScaleCard(grid, header, colIdx, freq, total) {
       </span>
       <span class="text-xs text-gray-400">${total} respuesta${total !== 1 ? 's' : ''}</span>
     </div>
-    <div class="relative" style="height:180px">
-      <canvas id="${canvasId}"></canvas>
-    </div>
+    <div class="relative" style="height:180px"><canvas id="${canvasId}"></canvas></div>
     <div class="mt-3 space-y-1" id="legend_${colIdx}"></div>
   `;
   grid.appendChild(card);
@@ -458,28 +474,18 @@ function renderScaleCard(grid, header, colIdx, freq, total) {
   });
 
   const ctx    = document.getElementById(canvasId);
-  const labels = nums.map(String);
-  const data   = nums.map(n => freq[String(n)] || 0);
-  const colors = nums.map(n => scaleColor(n, minVal, maxVal));
-
   state.charts[canvasId] = new Chart(ctx, {
     type: 'bar',
-    data: { labels, datasets: [{ data, backgroundColor: colors, borderRadius: 6, borderSkipped: false }] },
+    data: {
+      labels: nums.map(String),
+      datasets: [{ data: nums.map(n => freq[String(n)]||0), backgroundColor: nums.map(n => scaleColor(n,minVal,maxVal)), borderRadius:6, borderSkipped:false }]
+    },
     options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: c => {
-          const v = c.parsed.y;
-          return ` ${((v/total)*100).toFixed(1)}% · ${v} respuesta${v !== 1 ? 's' : ''}`;
-        }}}
-      },
+      responsive:true, maintainAspectRatio:false,
+      plugins: { legend:{display:false}, tooltip:{callbacks:{label:c=>{ const v=c.parsed.y; return ` ${((v/total)*100).toFixed(1)}% · ${v} respuesta${v!==1?'s':''}`; }}} },
       scales: {
-        x: { grid: { display: false }, ticks: { font: { size: 12, weight: '600' } } },
-        y: {
-          grid: { color: '#f3f4f6' },
-          ticks: { font: { size: 10 }, callback: v => `${((v/total)*100).toFixed(0)}%` }
-        }
+        x: { grid:{display:false}, ticks:{font:{size:12,weight:'600'}} },
+        y: { grid:{color:'#f3f4f6'}, ticks:{font:{size:10}, callback:v=>`${((v/total)*100).toFixed(0)}%`} }
       }
     }
   });
@@ -526,34 +532,27 @@ function renderClosedCard(grid, header, colIdx, sorted, total) {
   const data   = sorted.map(([,v]) => v);
   const colors = sorted.map((_,i) => COLORS[i%COLORS.length]);
 
-  const chartType = sorted.length <= 5 ? 'doughnut' : 'bar';
-  if (chartType === 'doughnut') {
+  if (sorted.length <= 5) {
     state.charts[canvasId] = new Chart(ctx, {
       type: 'doughnut',
-      data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }] },
+      data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth:2, borderColor:'#fff' }] },
       options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: c => ` ${c.label}: ${((c.parsed/total)*100).toFixed(1)}% (${c.parsed})` }}
-        },
-        cutout: '60%',
+        responsive:true, maintainAspectRatio:false,
+        plugins: { legend:{display:false}, tooltip:{callbacks:{label:c=>` ${c.label}: ${((c.parsed/total)*100).toFixed(1)}% (${c.parsed})`}} },
+        cutout:'60%',
       }
     });
   } else {
     state.charts[canvasId] = new Chart(ctx, {
       type: 'bar',
-      data: { labels, datasets: [{ data, backgroundColor: colors, borderRadius: 6, borderSkipped: false }] },
+      data: { labels, datasets: [{ data, backgroundColor: colors, borderRadius:6, borderSkipped:false }] },
       options: {
-        responsive: true, maintainAspectRatio: false,
+        responsive:true, maintainAspectRatio:false,
         indexAxis: useHorizontal ? 'y' : 'x',
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: c => { const v = c.parsed.x??c.parsed.y; return ` ${((v/total)*100).toFixed(1)}% (${v} resp.)`; }}}
-        },
+        plugins: { legend:{display:false}, tooltip:{callbacks:{label:c=>{ const v=c.parsed.x??c.parsed.y; return ` ${((v/total)*100).toFixed(1)}% (${v} resp.)`; }}} },
         scales: {
-          x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-          y: { grid: { color: '#f3f4f6' }, ticks: { font: { size: 11 } } }
+          x: { grid:{display:false}, ticks:{font:{size:11}} },
+          y: { grid:{color:'#f3f4f6'}, ticks:{font:{size:11}} }
         }
       }
     });
@@ -570,6 +569,11 @@ function scaleColor(value, minVal, maxVal) {
     const t = (ratio - 0.5) * 2;
     return `rgb(${Math.round(234+(22-234)*t)},${Math.round(179+(163-179)*t)},${Math.round(8+(74-8)*t)})`;
   }
+}
+function hasCanalFilter() {
+  const vals = uniqueValues(CANAL_COLUMN_INDEX, state.rawData);
+  if (vals.length < 2) return false;
+  return !vals.every(v => /^\d+(\.\d+)?$/.test(v.trim()));
 }
 function isOpenEnded(values, freq) {
   const uniqueCount = Object.keys(freq).length;
