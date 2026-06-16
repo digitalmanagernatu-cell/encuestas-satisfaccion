@@ -110,25 +110,30 @@
 // ============================================================
 const SHEET_ID = '1bU3eQQt4uNGTOGAI0Nppa8vcMfjMp4e6ey7Bb4LlcLQ';
 
+// Años de más reciente a más antiguo — sheetName = nombre exacto de la pestaña en el Sheet
 const YEARS = [
+  { label: '2026', sheetName: '2026' },
   { label: '2025', sheetName: '2025' },
   { label: '2024', sheetName: '2024' },
   { label: '2023', sheetName: '2023' },
   { label: '2022', sheetName: '2022' },
 ];
 
-// Base de clientes por año (total)
+// Base total de clientes por año (para calcular tasa de respuesta)
+// 2022-2024: solo canal granel
+// 2025: 758 granel + 195 distribución/gran consumo + 3.496 farmacias + otros = 5.788
+// 2026: 746 granel + 261 distribución/gran consumo + 8.726 farmacias = 9.733
 const CLIENT_BASE = {
   '2022': 617,
   '2023': 625,
   '2024': 684,
   '2025': 5788,
+  '2026': 9733,
 };
 
-const CANAL_COLUMN_INDEX = 1; // columna B (0-based); columna A = timestamp
+const CANAL_COLUMN_INDEX = 1; // columna B (0-based); columna A = timestamp del formulario
 // ============================================================
 
-// Paleta neutral para preguntas cerradas de opción múltiple
 const COLORS = [
   '#16a34a','#4ade80','#86efac','#22c55e','#15803d',
   '#bbf7d0','#6ee7b7','#34d399','#059669','#a7f3d0',
@@ -225,7 +230,6 @@ function renderStats() {
   const yearKey  = state.activeYear.label;
   const base     = CLIENT_BASE[yearKey] || null;
 
-  // Scale metrics across all numeric columns
   let scaleNormSum = 0, scaleCount = 0, maxPossible = 1, highCount = 0;
   const skipCols = new Set([0, CANAL_COLUMN_INDEX]);
   state.headers.forEach((h, ci) => {
@@ -248,7 +252,6 @@ function renderStats() {
   const satisfiedP = scaleCount > 0 ? Math.round((highCount / scaleCount) * 100) : null;
   const responseRate = base ? Math.round((total / base) * 100) : null;
 
-  // Build 4 cards — card 4 depends on filter state
   const card4 = state.activeCanal !== 'Todos'
     ? {
         icon: '🏪',
@@ -285,14 +288,14 @@ function renderStats() {
       icon: '⭐',
       value: avgRating !== null ? `${avgRating} / ${maxPossible}` : '—',
       label: 'Valoración media',
-      sub: `mayor puntuación = mejor`,
+      sub: 'mayor puntuación = mejor',
       color: avgRaw !== null && avgRaw / maxPossible >= 0.7 ? 'text-green-700' : 'text-amber-600',
     },
     {
       icon: '😊',
       value: satisfiedP !== null ? `${satisfiedP}%` : '—',
       label: 'Muy satisfechos',
-      sub: `puntuaron ≥ 80% de la escala`,
+      sub: 'puntuaron ≥ 80% de la escala',
       color: satisfiedP !== null && satisfiedP >= 70 ? 'text-green-700' : 'text-amber-600',
     },
     card4,
@@ -363,7 +366,6 @@ function renderCharts() {
 function renderOpenEndedCard(grid, header, colIdx, values, sorted, total) {
   openAnswers[colIdx] = values;
 
-  // Show repeated first, then fill up to 5 with unique (truncated)
   const repeated = sorted.filter(([,c]) => c > 1);
   const unique   = sorted.filter(([,c]) => c === 1).map(([l]) => l);
   const preview  = [
@@ -407,7 +409,7 @@ function renderOpenEndedCard(grid, header, colIdx, values, sorted, total) {
   grid.appendChild(card);
 }
 
-// ---- SCALE CARD (preguntas numéricas 1-N) ----
+// ---- SCALE CARD ----
 function renderScaleCard(grid, header, colIdx, freq, total) {
   const nums    = Object.keys(freq).map(Number).sort((a,b) => a-b);
   const maxVal  = Math.max(...nums);
@@ -436,7 +438,6 @@ function renderScaleCard(grid, header, colIdx, freq, total) {
   `;
   grid.appendChild(card);
 
-  // Legend with % for each value
   const legendEl = card.querySelector(`#legend_${colIdx}`);
   nums.forEach(n => {
     const count = freq[String(n)] || 0;
@@ -456,7 +457,6 @@ function renderScaleCard(grid, header, colIdx, freq, total) {
     legendEl.appendChild(row);
   });
 
-  // Chart — bar sorted 1→N with gradient colors
   const ctx    = document.getElementById(canvasId);
   const labels = nums.map(String);
   const data   = nums.map(n => freq[String(n)] || 0);
@@ -485,7 +485,7 @@ function renderScaleCard(grid, header, colIdx, freq, total) {
   });
 }
 
-// ---- CLOSED CARD (opción múltiple) ----
+// ---- CLOSED CARD ----
 function renderClosedCard(grid, header, colIdx, sorted, total) {
   const useHorizontal = sorted.length > 4;
   const canvasId = `chart_${colIdx}`;
@@ -562,20 +562,13 @@ function renderClosedCard(grid, header, colIdx, sorted, total) {
 
 // ---- HELPERS ----
 function scaleColor(value, minVal, maxVal) {
-  // Gradient: rojo → amarillo → verde según posición en la escala
   const ratio = maxVal === minVal ? 1 : (value - minVal) / (maxVal - minVal);
   if (ratio <= 0.5) {
     const t = ratio * 2;
-    const r = Math.round(220 + (234-220)*t);
-    const g = Math.round(38  + (179-38)*t);
-    const b = Math.round(38  + (8-38)*t);
-    return `rgb(${r},${g},${b})`;
+    return `rgb(${Math.round(220+(234-220)*t)},${Math.round(38+(179-38)*t)},${Math.round(38+(8-38)*t)})`;
   } else {
     const t = (ratio - 0.5) * 2;
-    const r = Math.round(234 + (22-234)*t);
-    const g = Math.round(179 + (163-179)*t);
-    const b = Math.round(8   + (74-8)*t);
-    return `rgb(${r},${g},${b})`;
+    return `rgb(${Math.round(234+(22-234)*t)},${Math.round(179+(163-179)*t)},${Math.round(8+(74-8)*t)})`;
   }
 }
 function isOpenEnded(values, freq) {
