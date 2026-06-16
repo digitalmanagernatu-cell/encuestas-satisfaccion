@@ -92,13 +92,10 @@
 
   <div id="dashboard" class="hidden">
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="statsRow"></div>
-
-    <!-- Filtro canal: solo visible cuando el año tiene columna de canal con texto -->
     <div id="canalFilterSection" class="hidden bg-white rounded-xl border border-gray-200 p-4 mb-6">
       <p class="text-sm font-semibold text-gray-700 mb-3">Filtrar por Canal</p>
       <div class="flex flex-wrap gap-2" id="channelFilters"></div>
     </div>
-
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="chartsGrid"></div>
   </div>
 </main>
@@ -121,9 +118,6 @@ const YEARS = [
   { label: '2022', sheetName: '2022' },
 ];
 
-// Base total de clientes por año
-// 2025: 758 granel + 195 distribución/gran consumo + 3.496 farmacias + otros = 5.788
-// 2026: 746 granel + 261 distribución/gran consumo + 8.726 farmacias = 9.733
 const CLIENT_BASE = {
   '2022': 617,
   '2023': 625,
@@ -132,7 +126,23 @@ const CLIENT_BASE = {
   '2026': 9733,
 };
 
-const CANAL_COLUMN_INDEX = 1; // columna B (0-based); columna A = timestamp del formulario
+// Reglas de fusión de respuestas por año.
+// Si un valor coincide con 'match' (RegExp o string exacto), se reemplaza por 'canonical'.
+// Útil cuando el enunciado de una opción cambia entre envíos pero significa lo mismo.
+const MERGE_RULES = {
+  '2026': [
+    {
+      // "Nuestras marcas (SevenKIDS, Vintage, Pacha...)" y
+      // "Nuestras marcas (SevenKIDS, Vintage...)" son la misma opción
+      match: /nuestras marcas/i,
+      canonical: 'Nuestras marcas (SevenKIDS, Vintage...)',
+    },
+  ],
+  // Ejemplo para añadir más años:
+  // '2025': [{ match: /texto a unificar/i, canonical: 'Etiqueta final' }],
+};
+
+const CANAL_COLUMN_INDEX = 1; // columna B (0-based); columna A = timestamp
 // ============================================================
 
 const COLORS = [
@@ -201,7 +211,7 @@ async function loadYear(year) {
 function parseAndRender(json, year) {
   const table = json.table;
   if (!table || !table.cols || !table.rows || table.rows.length === 0) {
-    document.getElementById('errorMsg').textContent = `Sin datos para ${year.label}. Verifica que el sheet sea público y que la hoja se llame exactamente "${year.sheetName}".`;
+    document.getElementById('errorMsg').textContent = `Sin datos para ${year.label}. Verifica que el sheet sea público y la hoja se llame exactamente "${year.sheetName}".`;
     show('errorState'); hide('loadingState'); return;
   }
   state.headers = table.cols.map(c => c.label || c.id);
@@ -212,12 +222,24 @@ function parseAndRender(json, year) {
   document.getElementById('lastUpdate').textContent = `Actualizado: ${ts.toLocaleDateString('es-AR')} ${ts.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}`;
 }
 
-// Devuelve true solo si la columna canal tiene valores de texto (no numéricos)
-// y al menos 2 opciones distintas — es decir, es una columna de canal real
+// Aplica las reglas de fusión del año activo a un array de valores de una columna
+function normalizeValues(values) {
+  const rules = MERGE_RULES[state.activeYear.label] || [];
+  if (!rules.length) return values;
+  return values.map(v => {
+    for (const rule of rules) {
+      const matched = rule.match instanceof RegExp
+        ? rule.match.test(v)
+        : v === rule.match;
+      if (matched) return rule.canonical;
+    }
+    return v;
+  });
+}
+
 function hasCanalFilter() {
   const vals = uniqueValues(CANAL_COLUMN_INDEX, state.rawData);
   if (vals.length < 2) return false;
-  // Si todos los valores son numéricos, no es una columna de canal
   return !vals.every(v => /^\d+(\.\d+)?$/.test(v.trim()));
 }
 
@@ -229,9 +251,7 @@ function getFilteredData() {
 function renderDashboard() {
   hide('loadingState'); hide('errorState');
   const canalActivo = hasCanalFilter();
-  // Mostrar u ocultar la sección de filtro canal
   canalActivo ? show('canalFilterSection') : hide('canalFilterSection');
-  // Si el año no tiene canal, resetear el filtro activo
   if (!canalActivo) state.activeCanal = 'Todos';
   renderStats(); renderChannelFilters(); renderCharts();
   show('dashboard');
@@ -239,21 +259,20 @@ function renderDashboard() {
 
 // ---- STATS ----
 function renderStats() {
-  const filtered  = getFilteredData();
-  const total     = state.rawData.length;
-  const shown     = filtered.length;
-  const yearKey   = state.activeYear.label;
-  const base      = CLIENT_BASE[yearKey] || null;
+  const filtered    = getFilteredData();
+  const total       = state.rawData.length;
+  const shown       = filtered.length;
+  const yearKey     = state.activeYear.label;
+  const base        = CLIENT_BASE[yearKey] || null;
   const canalActivo = hasCanalFilter();
 
-  // Columnas a excluir del cálculo de escala
   const skipCols = new Set([0]);
   if (canalActivo) skipCols.add(CANAL_COLUMN_INDEX);
 
   let scaleNormSum = 0, scaleCount = 0, maxPossible = 1, highCount = 0;
   state.headers.forEach((h, ci) => {
     if (skipCols.has(ci) || !h) return;
-    const vals = filtered.map(r => (r[ci]||'').trim()).filter(Boolean);
+    const vals = normalizeValues(filtered.map(r => (r[ci]||'').trim()).filter(Boolean));
     if (!isScaleQuestion(Object.keys(countFrequency(vals)))) return;
     const nums = vals.map(Number).filter(n => !isNaN(n));
     if (!nums.length) return;
@@ -266,52 +285,21 @@ function renderStats() {
     });
   });
 
-  const avgRaw     = scaleCount > 0 ? (scaleNormSum / scaleCount) * maxPossible : null;
-  const avgRating  = avgRaw !== null ? avgRaw.toFixed(1) : null;
-  const satisfiedP = scaleCount > 0 ? Math.round((highCount / scaleCount) * 100) : null;
+  const avgRaw      = scaleCount > 0 ? (scaleNormSum / scaleCount) * maxPossible : null;
+  const avgRating   = avgRaw !== null ? avgRaw.toFixed(1) : null;
+  const satisfiedP  = scaleCount > 0 ? Math.round((highCount / scaleCount) * 100) : null;
   const responseRate = base ? Math.round((total / base) * 100) : null;
 
-  // 4ª tarjeta: canal seleccionado (solo si hay filtro real activo), si no → tasa de respuesta
   const card4 = (canalActivo && state.activeCanal !== 'Todos')
-    ? {
-        icon: '🏪',
-        value: state.activeCanal,
-        label: 'Canal seleccionado',
-        sub: `${shown} respuesta${shown !== 1 ? 's' : ''}`,
-        color: 'text-green-700',
-      }
+    ? { icon:'🏪', value: state.activeCanal, label:'Canal seleccionado', sub:`${shown} respuesta${shown!==1?'s':''}`, color:'text-green-700' }
     : base
-    ? {
-        icon: '📬',
-        value: `${responseRate}%`,
-        label: 'Tasa de respuesta',
-        sub: `${total} de ${base.toLocaleString('es-AR')} clientes`,
-        color: responseRate >= 10 ? 'text-green-700' : 'text-amber-600',
-      }
-    : { icon: '📋', value: total, label: 'Respuestas totales', sub: yearKey, color: 'text-green-700' };
+    ? { icon:'📬', value:`${responseRate}%`, label:'Tasa de respuesta', sub:`${total} de ${base.toLocaleString('es-AR')} clientes`, color: responseRate>=10?'text-green-700':'text-amber-600' }
+    : { icon:'📋', value:total, label:'Respuestas totales', sub:yearKey, color:'text-green-700' };
 
   const stats = [
-    {
-      icon: '📋',
-      value: (canalActivo && state.activeCanal !== 'Todos') ? `${shown} / ${total}` : total,
-      label: 'Respuestas',
-      sub: (canalActivo && state.activeCanal !== 'Todos') ? 'filtradas / total' : `año ${yearKey}`,
-      color: 'text-green-700',
-    },
-    {
-      icon: '⭐',
-      value: avgRating !== null ? `${avgRating} / ${maxPossible}` : '—',
-      label: 'Valoración media',
-      sub: 'mayor puntuación = mejor',
-      color: avgRaw !== null && avgRaw / maxPossible >= 0.7 ? 'text-green-700' : 'text-amber-600',
-    },
-    {
-      icon: '😊',
-      value: satisfiedP !== null ? `${satisfiedP}%` : '—',
-      label: 'Muy satisfechos',
-      sub: 'puntuaron ≥ 80% de la escala',
-      color: satisfiedP !== null && satisfiedP >= 70 ? 'text-green-700' : 'text-amber-600',
-    },
+    { icon:'📋', value:(canalActivo&&state.activeCanal!=='Todos')?`${shown} / ${total}`:total, label:'Respuestas', sub:(canalActivo&&state.activeCanal!=='Todos')?'filtradas / total':`año ${yearKey}`, color:'text-green-700' },
+    { icon:'⭐', value:avgRating!==null?`${avgRating} / ${maxPossible}`:'—', label:'Valoración media', sub:'mayor puntuación = mejor', color:avgRaw!==null&&avgRaw/maxPossible>=0.7?'text-green-700':'text-amber-600' },
+    { icon:'😊', value:satisfiedP!==null?`${satisfiedP}%`:'—', label:'Muy satisfechos', sub:'puntuaron ≥ 80% de la escala', color:satisfiedP!==null&&satisfiedP>=70?'text-green-700':'text-amber-600' },
     card4,
   ];
 
@@ -320,7 +308,7 @@ function renderStats() {
       <div class="text-2xl mb-1">${s.icon}</div>
       <div class="text-xl font-bold ${s.color} leading-tight">${s.value}</div>
       <div class="text-xs text-gray-600 mt-1 font-medium">${s.label}</div>
-      <div class="text-xs text-gray-400">${s.sub || ''}</div>
+      <div class="text-xs text-gray-400">${s.sub||''}</div>
     </div>
   `).join('');
 }
@@ -336,7 +324,7 @@ function renderChannelFilters() {
       : state.rawData.filter(r => (r[CANAL_COLUMN_INDEX]||'').trim() === canal).length;
     const btn = document.createElement('button');
     btn.textContent = `${canal} (${count})`;
-    btn.className = `px-4 py-2 rounded-full text-sm font-medium transition-colors ${state.activeCanal === canal ? 'filter-btn-active' : 'filter-btn-inactive'}`;
+    btn.className = `px-4 py-2 rounded-full text-sm font-medium transition-colors ${state.activeCanal===canal?'filter-btn-active':'filter-btn-inactive'}`;
     btn.onclick = () => {
       state.activeCanal = canal;
       Object.values(state.charts).forEach(c => c.destroy());
@@ -355,16 +343,16 @@ function renderCharts() {
 
   const filtered    = getFilteredData();
   const canalActivo = hasCanalFilter();
-
-  // Solo excluir columna canal si realmente ES una columna de canal
-  const skipCols = new Set([0]);
+  const skipCols    = new Set([0]);
   if (canalActivo) skipCols.add(CANAL_COLUMN_INDEX);
 
   state.headers.forEach((header, colIdx) => {
     if (skipCols.has(colIdx) || !header) return;
     if (/timestamp|marca temporal/i.test(header)) return;
 
-    const values = filtered.map(r => (r[colIdx]||'').trim()).filter(Boolean);
+    // Obtener valores y aplicar reglas de fusión
+    const raw    = filtered.map(r => (r[colIdx]||'').trim()).filter(Boolean);
+    const values = normalizeValues(raw);
     if (!values.length) return;
 
     const freq   = countFrequency(values);
@@ -387,23 +375,22 @@ function renderOpenEndedCard(grid, header, colIdx, values, sorted, total) {
   const repeated = sorted.filter(([,c]) => c > 1);
   const unique   = sorted.filter(([,c]) => c === 1).map(([l]) => l);
   const preview  = [
-    ...repeated.map(([l, c]) => ({ text: l, count: c, pct: ((c/total)*100).toFixed(0), repeated: true })),
-    ...unique.slice(0, Math.max(0, 5 - repeated.length)).map(l => ({ text: l, count: 1, pct: ((1/total)*100).toFixed(0), repeated: false })),
+    ...repeated.map(([l,c]) => ({ text:l, count:c, pct:((c/total)*100).toFixed(0), repeated:true })),
+    ...unique.slice(0, Math.max(0, 5 - repeated.length)).map(l => ({ text:l, count:1, pct:((1/total)*100).toFixed(0), repeated:false })),
   ].slice(0, 5);
 
   const card = document.createElement('div');
   card.className = 'chart-card bg-white rounded-xl border border-gray-200 p-5';
 
   const previewHtml = preview.length
-    ? preview.map(({ text, count, pct, repeated: rep }, i) => `
-        <div class="${i < preview.length - 1 ? 'pb-2 border-b border-gray-50' : ''}">
+    ? preview.map(({text,count,pct,repeated:rep},i) => `
+        <div class="${i<preview.length-1?'pb-2 border-b border-gray-50':''}">
           <div class="flex justify-between items-start gap-2 mb-1">
-            <span class="text-xs text-gray-700 leading-snug flex-1">${truncateLabel(text, 72)}</span>
-            <span class="text-xs flex-shrink-0 ${rep ? 'font-semibold text-green-700' : 'text-gray-400'}">${rep ? `${count}× · ` : ''}${pct}%</span>
+            <span class="text-xs text-gray-700 leading-snug flex-1">${truncateLabel(text,72)}</span>
+            <span class="text-xs flex-shrink-0 ${rep?'font-semibold text-green-700':'text-gray-400'}">${rep?`${count}× · `:''}${pct}%</span>
           </div>
-          ${rep ? `<div class="h-1 rounded-full bg-gray-100"><div class="h-full rounded-full bg-green-400" style="width:${pct}%"></div></div>` : ''}
-        </div>`)
-      .join('')
+          ${rep?`<div class="h-1 rounded-full bg-gray-100"><div class="h-full rounded-full bg-green-400" style="width:${pct}%"></div></div>`:''}
+        </div>`).join('')
     : `<p class="text-xs text-gray-400 italic">Sin respuestas disponibles.</p>`;
 
   card.innerHTML = `
@@ -411,7 +398,7 @@ function renderOpenEndedCard(grid, header, colIdx, values, sorted, total) {
       <div class="flex-1">
         <span class="inline-block text-xs font-medium bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full mb-1">Pregunta abierta</span>
         <h3 class="text-sm font-semibold text-gray-800 leading-snug">${header}</h3>
-        <p class="text-xs text-gray-400">${total} respuesta${total !== 1 ? 's' : ''}</p>
+        <p class="text-xs text-gray-400">${total} respuesta${total!==1?'s':''}</p>
       </div>
       <button onclick="openModal(${colIdx})"
         class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-semibold rounded-lg transition-colors border border-green-200">
@@ -422,32 +409,30 @@ function renderOpenEndedCard(grid, header, colIdx, values, sorted, total) {
       </button>
     </div>
     <div class="space-y-2">${previewHtml}</div>
-    ${values.length > 5 ? `<p class="text-xs text-gray-400 mt-3 text-center">… y ${values.length - 5} respuestas más</p>` : ''}
+    ${values.length>5?`<p class="text-xs text-gray-400 mt-3 text-center">… y ${values.length-5} respuestas más</p>`:''}
   `;
   grid.appendChild(card);
 }
 
 // ---- SCALE CARD ----
 function renderScaleCard(grid, header, colIdx, freq, total) {
-  const nums    = Object.keys(freq).map(Number).sort((a,b) => a-b);
-  const maxVal  = Math.max(...nums);
-  const minVal  = Math.min(...nums);
+  const nums   = Object.keys(freq).map(Number).sort((a,b)=>a-b);
+  const maxVal = Math.max(...nums);
+  const minVal = Math.min(...nums);
   const allNums = [];
-  Object.entries(freq).forEach(([k, v]) => { for(let i=0;i<v;i++) allNums.push(Number(k)); });
-  const avg = (allNums.reduce((s,n) => s+n, 0) / allNums.length).toFixed(2);
-  const avgColor = (Number(avg)/maxVal) >= 0.7 ? '#16a34a' : (Number(avg)/maxVal) >= 0.5 ? '#d97706' : '#dc2626';
-
+  Object.entries(freq).forEach(([k,v]) => { for(let i=0;i<v;i++) allNums.push(Number(k)); });
+  const avg = (allNums.reduce((s,n)=>s+n,0)/allNums.length).toFixed(2);
+  const avgColor = (Number(avg)/maxVal)>=0.7?'#16a34a':(Number(avg)/maxVal)>=0.5?'#d97706':'#dc2626';
   const canvasId = `chart_${colIdx}`;
+
   const card = document.createElement('div');
   card.className = 'chart-card bg-white rounded-xl border border-gray-200 p-5';
   card.innerHTML = `
     <h3 class="text-sm font-semibold text-gray-800 leading-snug">${header}</h3>
     <p class="scale-hint">${minVal} = peor valoración &nbsp;·&nbsp; ${maxVal} = mejor valoración</p>
     <div class="flex items-center gap-3 mt-2 mb-3">
-      <span class="avg-badge" style="color:${avgColor};border-color:${avgColor}20;background:${avgColor}10">
-        ⭐ Media: ${avg} / ${maxVal}
-      </span>
-      <span class="text-xs text-gray-400">${total} respuesta${total !== 1 ? 's' : ''}</span>
+      <span class="avg-badge" style="color:${avgColor};border-color:${avgColor}20;background:${avgColor}10">⭐ Media: ${avg} / ${maxVal}</span>
+      <span class="text-xs text-gray-400">${total} respuesta${total!==1?'s':''}</span>
     </div>
     <div class="relative" style="height:180px"><canvas id="${canvasId}"></canvas></div>
     <div class="mt-3 space-y-1" id="legend_${colIdx}"></div>
@@ -456,37 +441,29 @@ function renderScaleCard(grid, header, colIdx, freq, total) {
 
   const legendEl = card.querySelector(`#legend_${colIdx}`);
   nums.forEach(n => {
-    const count = freq[String(n)] || 0;
-    const pct   = ((count / total) * 100).toFixed(1);
-    const col   = scaleColor(n, minVal, maxVal);
+    const count = freq[String(n)]||0;
+    const pct   = ((count/total)*100).toFixed(1);
+    const col   = scaleColor(n,minVal,maxVal);
     const row   = document.createElement('div');
     row.className = 'flex items-center gap-2 text-xs';
     row.innerHTML = `
       <span class="w-3 h-3 rounded-sm flex-shrink-0" style="background:${col}"></span>
       <span class="text-gray-500 w-4 flex-shrink-0 font-medium">${n}</span>
-      <div class="flex-1 h-1.5 rounded-full bg-gray-100">
-        <div class="h-full rounded-full" style="width:${pct}%;background:${col}"></div>
-      </div>
+      <div class="flex-1 h-1.5 rounded-full bg-gray-100"><div class="h-full rounded-full" style="width:${pct}%;background:${col}"></div></div>
       <span class="font-semibold text-gray-700 w-10 text-right">${pct}%</span>
       <span class="text-gray-400 w-10 text-right">(${count})</span>
     `;
     legendEl.appendChild(row);
   });
 
-  const ctx    = document.getElementById(canvasId);
+  const ctx = document.getElementById(canvasId);
   state.charts[canvasId] = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: nums.map(String),
-      datasets: [{ data: nums.map(n => freq[String(n)]||0), backgroundColor: nums.map(n => scaleColor(n,minVal,maxVal)), borderRadius:6, borderSkipped:false }]
-    },
-    options: {
+    type:'bar',
+    data:{ labels:nums.map(String), datasets:[{ data:nums.map(n=>freq[String(n)]||0), backgroundColor:nums.map(n=>scaleColor(n,minVal,maxVal)), borderRadius:6, borderSkipped:false }] },
+    options:{
       responsive:true, maintainAspectRatio:false,
-      plugins: { legend:{display:false}, tooltip:{callbacks:{label:c=>{ const v=c.parsed.y; return ` ${((v/total)*100).toFixed(1)}% · ${v} respuesta${v!==1?'s':''}`; }}} },
-      scales: {
-        x: { grid:{display:false}, ticks:{font:{size:12,weight:'600'}} },
-        y: { grid:{color:'#f3f4f6'}, ticks:{font:{size:10}, callback:v=>`${((v/total)*100).toFixed(0)}%`} }
-      }
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>{ const v=c.parsed.y; return ` ${((v/total)*100).toFixed(1)}% · ${v} respuesta${v!==1?'s':''}`; }}} },
+      scales:{ x:{grid:{display:false},ticks:{font:{size:12,weight:'600'}}}, y:{grid:{color:'#f3f4f6'},ticks:{font:{size:10},callback:v=>`${((v/total)*100).toFixed(0)}%`}} }
     }
   });
 }
@@ -500,17 +477,15 @@ function renderClosedCard(grid, header, colIdx, sorted, total) {
   card.className = 'chart-card bg-white rounded-xl border border-gray-200 p-5';
   card.innerHTML = `
     <h3 class="text-sm font-semibold text-gray-800 mb-1 leading-snug">${header}</h3>
-    <p class="text-xs text-gray-400 mb-3">${total} respuesta${total !== 1 ? 's' : ''}</p>
-    <div class="relative" style="height:${useHorizontal ? Math.max(160, sorted.length * 34) : 210}px">
-      <canvas id="${canvasId}"></canvas>
-    </div>
+    <p class="text-xs text-gray-400 mb-3">${total} respuesta${total!==1?'s':''}</p>
+    <div class="relative" style="height:${useHorizontal?Math.max(160,sorted.length*34):210}px"><canvas id="${canvasId}"></canvas></div>
     <div class="mt-3 space-y-1" id="legend_${colIdx}"></div>
   `;
   grid.appendChild(card);
 
   const legendEl = card.querySelector(`#legend_${colIdx}`);
-  sorted.forEach(([label, count], i) => {
-    const pct = ((count / total) * 100).toFixed(1);
+  sorted.forEach(([label,count],i) => {
+    const pct = ((count/total)*100).toFixed(1);
     const row = document.createElement('div');
     row.className = 'flex items-center justify-between text-xs';
     row.innerHTML = `
@@ -528,32 +503,24 @@ function renderClosedCard(grid, header, colIdx, sorted, total) {
   });
 
   const ctx    = document.getElementById(canvasId);
-  const labels = sorted.map(([l]) => truncateLabel(l, 35));
-  const data   = sorted.map(([,v]) => v);
-  const colors = sorted.map((_,i) => COLORS[i%COLORS.length]);
+  const labels = sorted.map(([l])=>truncateLabel(l,35));
+  const data   = sorted.map(([,v])=>v);
+  const colors = sorted.map((_,i)=>COLORS[i%COLORS.length]);
 
   if (sorted.length <= 5) {
-    state.charts[canvasId] = new Chart(ctx, {
-      type: 'doughnut',
-      data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth:2, borderColor:'#fff' }] },
-      options: {
-        responsive:true, maintainAspectRatio:false,
-        plugins: { legend:{display:false}, tooltip:{callbacks:{label:c=>` ${c.label}: ${((c.parsed/total)*100).toFixed(1)}% (${c.parsed})`}} },
-        cutout:'60%',
-      }
+    state.charts[canvasId] = new Chart(ctx,{
+      type:'doughnut',
+      data:{ labels, datasets:[{ data, backgroundColor:colors, borderWidth:2, borderColor:'#fff' }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>` ${c.label}: ${((c.parsed/total)*100).toFixed(1)}% (${c.parsed})`}} }, cutout:'60%' }
     });
   } else {
-    state.charts[canvasId] = new Chart(ctx, {
-      type: 'bar',
-      data: { labels, datasets: [{ data, backgroundColor: colors, borderRadius:6, borderSkipped:false }] },
-      options: {
-        responsive:true, maintainAspectRatio:false,
-        indexAxis: useHorizontal ? 'y' : 'x',
-        plugins: { legend:{display:false}, tooltip:{callbacks:{label:c=>{ const v=c.parsed.x??c.parsed.y; return ` ${((v/total)*100).toFixed(1)}% (${v} resp.)`; }}} },
-        scales: {
-          x: { grid:{display:false}, ticks:{font:{size:11}} },
-          y: { grid:{color:'#f3f4f6'}, ticks:{font:{size:11}} }
-        }
+    state.charts[canvasId] = new Chart(ctx,{
+      type:'bar',
+      data:{ labels, datasets:[{ data, backgroundColor:colors, borderRadius:6, borderSkipped:false }] },
+      options:{
+        responsive:true, maintainAspectRatio:false, indexAxis:useHorizontal?'y':'x',
+        plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>{ const v=c.parsed.x??c.parsed.y; return ` ${((v/total)*100).toFixed(1)}% (${v} resp.)`; }}} },
+        scales:{ x:{grid:{display:false},ticks:{font:{size:11}}}, y:{grid:{color:'#f3f4f6'},ticks:{font:{size:11}}} }
       }
     });
   }
@@ -561,14 +528,9 @@ function renderClosedCard(grid, header, colIdx, sorted, total) {
 
 // ---- HELPERS ----
 function scaleColor(value, minVal, maxVal) {
-  const ratio = maxVal === minVal ? 1 : (value - minVal) / (maxVal - minVal);
-  if (ratio <= 0.5) {
-    const t = ratio * 2;
-    return `rgb(${Math.round(220+(234-220)*t)},${Math.round(38+(179-38)*t)},${Math.round(38+(8-38)*t)})`;
-  } else {
-    const t = (ratio - 0.5) * 2;
-    return `rgb(${Math.round(234+(22-234)*t)},${Math.round(179+(163-179)*t)},${Math.round(8+(74-8)*t)})`;
-  }
+  const ratio = maxVal===minVal ? 1 : (value-minVal)/(maxVal-minVal);
+  if (ratio<=0.5) { const t=ratio*2; return `rgb(${Math.round(220+(234-220)*t)},${Math.round(38+(179-38)*t)},${Math.round(38+(8-38)*t)})`; }
+  else { const t=(ratio-0.5)*2; return `rgb(${Math.round(234+(22-234)*t)},${Math.round(179+(163-179)*t)},${Math.round(8+(74-8)*t)})`; }
 }
 function hasCanalFilter() {
   const vals = uniqueValues(CANAL_COLUMN_INDEX, state.rawData);
@@ -578,20 +540,20 @@ function hasCanalFilter() {
 function isOpenEnded(values, freq) {
   const uniqueCount = Object.keys(freq).length;
   const total = values.length;
-  const avgLen = values.reduce((s,v) => s+v.length, 0) / total;
-  return (uniqueCount / total > 0.6) || avgLen > 30;
+  const avgLen = values.reduce((s,v)=>s+v.length,0)/total;
+  return (uniqueCount/total>0.6)||avgLen>30;
 }
 function uniqueValues(colIdx, rows) {
-  return [...new Set(rows.map(r => (r[colIdx]||'').trim()).filter(Boolean))];
+  return [...new Set(rows.map(r=>(r[colIdx]||'').trim()).filter(Boolean))];
 }
 function countFrequency(values) {
-  return values.reduce((acc, v) => { acc[v]=(acc[v]||0)+1; return acc; }, {});
+  return values.reduce((acc,v)=>{ acc[v]=(acc[v]||0)+1; return acc; },{});
 }
 function isScaleQuestion(options) {
-  return options.length > 1 && options.every(o => /^\d+$/.test(o.trim()));
+  return options.length>1 && options.every(o=>/^\d+$/.test(o.trim()));
 }
 function truncateLabel(str, max) {
-  return str.length > max ? str.slice(0, max) + '…' : str;
+  return str.length>max ? str.slice(0,max)+'…' : str;
 }
 function show(id) { document.getElementById(id).classList.remove('hidden'); }
 function hide(id) { document.getElementById(id).classList.add('hidden'); }
