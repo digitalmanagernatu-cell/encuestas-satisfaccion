@@ -9,29 +9,20 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     body { font-family:'Inter',sans-serif; }
-
     .tab-active   { background:#3e3f3e; color:#fff; }
     .tab-inactive { background:#f5f2ea; color:#3e3f3e; }
     .tab-inactive:hover { background:#dcd5be; }
-
     .filter-btn-active   { background:#3e3f3e; color:#fff; }
     .filter-btn-inactive { background:#f5f2ea; color:#3e3f3e; border:1px solid #dcd5be; }
     .filter-btn-inactive:hover { background:#dcd5be; }
-
     .chart-card { transition:box-shadow .2s; }
     .chart-card:hover { box-shadow:0 8px 30px rgba(62,63,62,.12); }
-
     .stat-card { background:linear-gradient(135deg,#f5f2ea 0%,#dcd5be 100%); }
-
-    .loader { border:4px solid #f3f3f3; border-top:4px solid #3e3f3e; border-radius:50%;
-              width:48px; height:48px; animation:spin 1s linear infinite; }
+    .loader { border:4px solid #f3f3f3; border-top:4px solid #3e3f3e; border-radius:50%; width:48px; height:48px; animation:spin 1s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
-
     .modal-backdrop { background:rgba(0,0,0,.45); }
     .scale-hint { font-size:10px; color:#9ca3af; margin-top:2px; }
-    .avg-badge { display:inline-flex; align-items:center; gap:4px;
-                 border-radius:9999px; padding:2px 10px;
-                 font-size:12px; font-weight:600; margin-bottom:8px; }
+    .avg-badge { display:inline-flex; align-items:center; gap:4px; border-radius:9999px; padding:2px 10px; font-size:12px; font-weight:600; margin-bottom:8px; }
     .btn-corp { background:#f5f2ea; border:1px solid #dcd5be; color:#3e3f3e; }
     .btn-corp:hover { background:#dcd5be; }
     .badge-open { background:#f5f2ea; color:#3e3f3e; }
@@ -39,15 +30,12 @@
 </head>
 <body class="bg-gray-50 min-h-screen">
 
-<!-- MODAL respuestas abiertas -->
 <div id="openModal" class="fixed inset-0 z-50 hidden flex items-center justify-center modal-backdrop p-4">
   <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
     <div class="flex items-center justify-between p-5 border-b border-gray-100">
       <h2 id="modalTitle" class="text-base font-semibold text-gray-800 pr-4 leading-snug"></h2>
       <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 flex-shrink-0">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-        </svg>
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
       </button>
     </div>
     <div id="modalBody" class="overflow-y-auto p-5 space-y-2"></div>
@@ -55,7 +43,6 @@
   </div>
 </div>
 
-<!-- HEADER -->
 <header class="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-30">
   <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
     <div class="flex items-center gap-3">
@@ -69,7 +56,6 @@
   </div>
 </header>
 
-<!-- YEAR TABS -->
 <div class="bg-white border-b border-gray-200">
   <div class="max-w-7xl mx-auto px-4">
     <div id="yearTabs" class="flex gap-1 py-2 overflow-x-auto"></div>
@@ -81,7 +67,6 @@
     <div class="loader mb-4"></div>
     <p class="text-gray-500">Cargando datos del Google Sheet…</p>
   </div>
-
   <div id="errorState" class="hidden">
     <div class="bg-red-50 border border-red-200 rounded-xl p-6 max-w-2xl mx-auto mt-12">
       <h2 class="text-red-700 font-semibold text-lg mb-2">No se pudieron cargar los datos</h2>
@@ -90,22 +75,19 @@
         <p class="text-gray-700 text-sm font-medium mb-2">Para solucionar esto:</p>
         <ol class="text-gray-600 text-sm space-y-1 list-decimal list-inside">
           <li>Abre el Google Sheet</li>
-          <li>Haz clic en <strong>Compartir</strong> (arriba a la derecha)</li>
+          <li>Haz clic en <strong>Compartir</strong></li>
           <li>Cambia el acceso a <strong>"Cualquier persona con el enlace puede ver"</strong></li>
           <li>Recarga esta página</li>
         </ol>
       </div>
     </div>
   </div>
-
   <div id="dashboard" class="hidden">
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="statsRow"></div>
-
     <div id="canalFilterSection" class="hidden bg-white rounded-xl border p-4 mb-6" style="border-color:#dcd5be">
       <p class="text-sm font-semibold mb-3" style="color:#3e3f3e">Filtrar por Canal</p>
       <div class="flex flex-wrap gap-2" id="channelFilters"></div>
     </div>
-
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="chartsGrid"></div>
   </div>
 </main>
@@ -117,21 +99,18 @@
 <script>
 const SHEET_ID = '1bU3eQQt4uNGTOGAI0Nppa8vcMfjMp4e6ey7Bb4LlcLQ';
 const YEARS = [
-  { label: '2026', sheetName: '2026' },
-  { label: '2025', sheetName: '2025' },
-  { label: '2024', sheetName: '2024' },
-  { label: '2023', sheetName: '2023' },
-  { label: '2022', sheetName: '2022' },
+  { label:'2026', sheetName:'2026' },
+  { label:'2025', sheetName:'2025' },
+  { label:'2024', sheetName:'2024' },
+  { label:'2023', sheetName:'2023' },
+  { label:'2022', sheetName:'2022' },
 ];
 const CLIENT_BASE = { '2022':617,'2023':625,'2024':684,'2025':5788,'2026':9733 };
 const MERGE_RULES = {
   '2026': [{ match:/nuestras marcas/i, canonical:'Nuestras marcas (SevenKIDS, Vintage...)' }],
 };
 const CANAL_COLUMN_INDEX = 1;
-const COLORS = [
-  '#3e3f3e','#e2a29a','#e4bca5','#d3d7c4','#dcd5be',
-  '#dad7d1','#b8a898','#a8b09e','#c4b4a4','#e8e0d4','#8e9e8a','#c8a898',
-];
+const COLORS = ['#3e3f3e','#e2a29a','#e4bca5','#d3d7c4','#dcd5be','#dad7d1','#b8a898','#a8b09e','#c4b4a4','#e8e0d4','#8e9e8a','#c8a898'];
 
 let state = { activeYear:YEARS[0], rawData:[], headers:[], activeCanal:'Todos', charts:{} };
 let openAnswers = {};
@@ -141,279 +120,318 @@ renderYearTabs();
 loadYear(YEARS[0]);
 
 function openModal(colIdx) {
-  const answers = openAnswers[colIdx]||[];
+  const answers = openAnswers[colIdx] || [];
   document.getElementById('modalTitle').textContent = state.headers[colIdx];
-  document.getElementById('modalCount').textContent = `${answers.length} respuesta${answers.length!==1?'s':''} en total`;
+  document.getElementById('modalCount').textContent = answers.length + ' respuesta' + (answers.length !== 1 ? 's' : '') + ' en total';
   const body = document.getElementById('modalBody');
   body.innerHTML = '';
-  answers.forEach((a,i) => {
+  answers.forEach(function(a, i) {
     const d = document.createElement('div');
     d.className = 'flex gap-3 items-start rounded-lg px-4 py-2.5';
     d.style.background = '#f5f2ea';
-    d.innerHTML = `<span class="text-xs text-gray-400 pt-0.5 flex-shrink-0 w-5 text-right">${i+1}</span><span class="text-sm text-gray-700 leading-relaxed">${a}</span>`;
+    d.innerHTML = '<span class="text-xs text-gray-400 pt-0.5 flex-shrink-0 w-5 text-right">' + (i+1) + '</span><span class="text-sm text-gray-700 leading-relaxed">' + a + '</span>';
     body.appendChild(d);
   });
   document.getElementById('openModal').classList.remove('hidden');
 }
 function closeModal() { document.getElementById('openModal').classList.add('hidden'); }
-document.getElementById('openModal').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal(); });
+document.getElementById('openModal').addEventListener('click', function(e) { if (e.target === e.currentTarget) closeModal(); });
 
 function renderYearTabs() {
   const container = document.getElementById('yearTabs');
   container.innerHTML = '';
-  YEARS.forEach(y => {
+  YEARS.forEach(function(y) {
     const btn = document.createElement('button');
     btn.textContent = y.label;
-    btn.className = `px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${y.label===state.activeYear.label?'tab-active':'tab-inactive'}`;
-    btn.onclick = () => { state.activeYear=y; renderYearTabs(); loadYear(y); };
+    btn.className = 'px-5 py-2 rounded-lg text-sm font-semibold transition-colors ' + (y.label === state.activeYear.label ? 'tab-active' : 'tab-inactive');
+    btn.onclick = function() { state.activeYear = y; renderYearTabs(); loadYear(y); };
     container.appendChild(btn);
   });
 }
 
 async function loadYear(year) {
   show('loadingState'); hide('errorState'); hide('dashboard');
-  Object.values(state.charts).forEach(c=>c.destroy()); state.charts={};
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(year.sheetName)}`;
+  Object.values(state.charts).forEach(function(c) { c.destroy(); }); state.charts = {};
+  const url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID + '/gviz/tq?tqx=out:json&sheet=' + encodeURIComponent(year.sheetName);
   try {
     const res = await fetch(url);
-    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const text = await res.text();
-    const json = JSON.parse(text.substring(text.indexOf('{'),text.lastIndexOf('}')+1));
-    parseAndRender(json,year);
+    const json = JSON.parse(text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1));
+    parseAndRender(json, year);
   } catch(e) {
     document.getElementById('errorMsg').textContent = e.message;
     show('errorState'); hide('loadingState');
   }
 }
 
-function parseAndRender(json,year) {
+function parseAndRender(json, year) {
   const table = json.table;
-  if(!table||!table.cols||!table.rows||table.rows.length===0) {
-    document.getElementById('errorMsg').textContent = `Sin datos para ${year.label}.`;
+  if (!table || !table.cols || !table.rows || table.rows.length === 0) {
+    document.getElementById('errorMsg').textContent = 'Sin datos para ' + year.label + '.';
     show('errorState'); hide('loadingState'); return;
   }
-  state.headers = table.cols.map(c=>c.label||c.id);
-  state.rawData = table.rows.map(r=>r.c.map(cell=>(cell&&cell.v!=null)?String(cell.v):''));
+  state.headers = table.cols.map(function(c) { return c.label || c.id; });
+  state.rawData = table.rows.map(function(r) { return r.c.map(function(cell) { return (cell && cell.v != null) ? String(cell.v) : ''; }); });
   state.activeCanal = 'Todos';
   renderDashboard();
   const ts = new Date();
-  document.getElementById('lastUpdate').textContent = `Actualizado: ${ts.toLocaleDateString('es-AR')} ${ts.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}`;
+  document.getElementById('lastUpdate').textContent = 'Actualizado: ' + ts.toLocaleDateString('es-AR') + ' ' + ts.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
 }
 
 function normalizeValues(values) {
-  const rules = MERGE_RULES[state.activeYear.label]||[];
-  if(!rules.length) return values;
-  return values.map(v => { for(const r of rules) { if(r.match instanceof RegExp?r.match.test(v):v===r.match) return r.canonical; } return v; });
+  const rules = MERGE_RULES[state.activeYear.label] || [];
+  if (!rules.length) return values;
+  return values.map(function(v) {
+    for (let i = 0; i < rules.length; i++) {
+      const r = rules[i];
+      if (r.match instanceof RegExp ? r.match.test(v) : v === r.match) return r.canonical;
+    }
+    return v;
+  });
 }
 
 function hasCanalFilter() {
-  const vals = uniqueValues(CANAL_COLUMN_INDEX,state.rawData);
-  if(vals.length<2) return false;
-  return !vals.every(v=>/^\d+(\.\d+)?$/.test(v.trim()));
+  const vals = uniqueValues(CANAL_COLUMN_INDEX, state.rawData);
+  if (vals.length < 2) return false;
+  return !vals.every(function(v) { return /^\d+(\.\d+)?$/.test(v.trim()); });
 }
 
 function getFilteredData() {
-  if(!hasCanalFilter()||state.activeCanal==='Todos') return state.rawData;
-  return state.rawData.filter(r=>(r[CANAL_COLUMN_INDEX]||'').trim()===state.activeCanal);
+  if (!hasCanalFilter() || state.activeCanal === 'Todos') return state.rawData;
+  return state.rawData.filter(function(r) { return (r[CANAL_COLUMN_INDEX] || '').trim() === state.activeCanal; });
 }
 
 function renderDashboard() {
   hide('loadingState'); hide('errorState');
   const canalActivo = hasCanalFilter();
-  canalActivo?show('canalFilterSection'):hide('canalFilterSection');
-  if(!canalActivo) state.activeCanal='Todos';
+  if (canalActivo) show('canalFilterSection'); else hide('canalFilterSection');
+  if (!canalActivo) state.activeCanal = 'Todos';
   renderStats(); renderChannelFilters(); renderCharts();
   show('dashboard');
 }
 
 function renderStats() {
-  const filtered=getFilteredData(), total=state.rawData.length, shown=filtered.length;
-  const yearKey=state.activeYear.label, base=CLIENT_BASE[yearKey]||null;
-  const canalActivo=hasCanalFilter();
-  const skipCols=new Set([0]); if(canalActivo) skipCols.add(CANAL_COLUMN_INDEX);
-  let scaleNormSum=0,scaleCount=0,maxPossible=1,highCount=0;
-  state.headers.forEach((h,ci)=>{
-    if(skipCols.has(ci)||!h) return;
-    const vals=normalizeValues(filtered.map(r=>(r[ci]||'').trim()).filter(Boolean));
-    if(!isScaleQuestion(Object.keys(countFrequency(vals)))) return;
-    const nums=vals.map(Number).filter(n=>!isNaN(n)); if(!nums.length) return;
-    const mx=Math.max(...nums); maxPossible=mx;
-    nums.forEach(n=>{scaleNormSum+=n/mx;scaleCount++;if(n/mx>=0.8)highCount++;});
+  const filtered = getFilteredData();
+  const total = state.rawData.length;
+  const shown = filtered.length;
+  const yearKey = state.activeYear.label;
+  const base = CLIENT_BASE[yearKey] || null;
+  const canalActivo = hasCanalFilter();
+  const skipCols = new Set([0]);
+  if (canalActivo) skipCols.add(CANAL_COLUMN_INDEX);
+  let scaleNormSum = 0, scaleCount = 0, maxPossible = 1, highCount = 0;
+  state.headers.forEach(function(h, ci) {
+    if (skipCols.has(ci) || !h) return;
+    const vals = normalizeValues(filtered.map(function(r) { return (r[ci] || '').trim(); }).filter(Boolean));
+    if (!isScaleQuestion(Object.keys(countFrequency(vals)))) return;
+    const nums = vals.map(Number).filter(function(n) { return !isNaN(n); });
+    if (!nums.length) return;
+    const mx = Math.max.apply(null, nums); maxPossible = mx;
+    nums.forEach(function(n) { scaleNormSum += n/mx; scaleCount++; if (n/mx >= 0.8) highCount++; });
   });
-  const avgRaw=scaleCount>0?(scaleNormSum/scaleCount)*maxPossible:null;
-  const avgRating=avgRaw!==null?avgRaw.toFixed(1):null;
-  const satisfiedP=scaleCount>0?Math.round((highCount/scaleCount)*100):null;
-  const responseRate=base?Math.round((total/base)*100):null;
-  const isGoodAvg=avgRaw!==null&&avgRaw/maxPossible>=0.7;
-  const isGoodSat=satisfiedP!==null&&satisfiedP>=70;
-  const isGoodRate=responseRate!==null&&responseRate>=10;
-  const card4=(canalActivo&&state.activeCanal!=='Todos')
-    ?{icon:'🏪',value:state.activeCanal,label:'Canal seleccionado',sub:`${shown} respuesta${shown!==1?'s':''}`,good:true}
-    :base
-    ?{icon:'📬',value:`${responseRate}%`,label:'Tasa de respuesta',sub:`${total} de ${base.toLocaleString('es-AR')} clientes`,good:isGoodRate}
-    :{icon:'📋',value:total,label:'Respuestas totales',sub:yearKey,good:true};
-  const stats=[
-    {icon:'📋',value:(canalActivo&&state.activeCanal!=='Todos')?`${shown} / ${total}`:total,label:'Respuestas',sub:(canalActivo&&state.activeCanal!=='Todos')?'filtradas / total':`año ${yearKey}`,good:true},
-    {icon:'⭐',value:avgRating!==null?`${avgRating} / ${maxPossible}`:'—',label:'Valoración media',sub:'mayor puntuación = mejor',good:isGoodAvg},
-    {icon:'😊',value:satisfiedP!==null?`${satisfiedP}%`:'—',label:'Muy satisfechos',sub:'puntuaron ≥ 80% de la escala',good:isGoodSat},
+  const avgRaw = scaleCount > 0 ? (scaleNormSum / scaleCount) * maxPossible : null;
+  const avgRating = avgRaw !== null ? avgRaw.toFixed(1) : null;
+  const satisfiedP = scaleCount > 0 ? Math.round((highCount / scaleCount) * 100) : null;
+  const responseRate = base ? Math.round((total / base) * 100) : null;
+  const isGoodAvg = avgRaw !== null && avgRaw / maxPossible >= 0.7;
+  const isGoodSat = satisfiedP !== null && satisfiedP >= 70;
+  const isGoodRate = responseRate !== null && responseRate >= 10;
+  const card4 = (canalActivo && state.activeCanal !== 'Todos')
+    ? { icon:'🏪', value:state.activeCanal, label:'Canal seleccionado', sub:shown + ' respuesta' + (shown !== 1 ? 's' : ''), good:true }
+    : base
+    ? { icon:'📬', value:responseRate + '%', label:'Tasa de respuesta', sub:total + ' de ' + base.toLocaleString('es-AR') + ' clientes', good:isGoodRate }
+    : { icon:'📋', value:total, label:'Respuestas totales', sub:yearKey, good:true };
+  const stats = [
+    { icon:'📋', value:(canalActivo && state.activeCanal !== 'Todos') ? shown + ' / ' + total : total, label:'Respuestas', sub:(canalActivo && state.activeCanal !== 'Todos') ? 'filtradas / total' : 'año ' + yearKey, good:true },
+    { icon:'⭐', value:avgRating !== null ? avgRating + ' / ' + maxPossible : '—', label:'Valoración media', sub:'mayor puntuación = mejor', good:isGoodAvg },
+    { icon:'😊', value:satisfiedP !== null ? satisfiedP + '%' : '—', label:'Muy satisfechos', sub:'puntuaron ≥ 80% de la escala', good:isGoodSat },
     card4,
   ];
-  document.getElementById('statsRow').innerHTML=stats.map(s=>`
-    <div class="stat-card rounded-xl p-4 border" style="border-color:#dcd5be">
-      <div class="text-2xl mb-1">${s.icon}</div>
-      <div class="text-xl font-bold leading-tight" style="color:${s.good?'#3e3f3e':'#d97706'}">${s.value}</div>
-      <div class="text-xs font-medium mt-1" style="color:#3e3f3e">${s.label}</div>
-      <div class="text-xs text-gray-400">${s.sub||''}</div>
-    </div>`).join('');
+  document.getElementById('statsRow').innerHTML = stats.map(function(s) {
+    return '<div class="stat-card rounded-xl p-4 border" style="border-color:#dcd5be">'
+      + '<div class="text-2xl mb-1">' + s.icon + '</div>'
+      + '<div class="text-xl font-bold leading-tight" style="color:' + (s.good ? '#3e3f3e' : '#d97706') + '">' + s.value + '</div>'
+      + '<div class="text-xs font-medium mt-1" style="color:#3e3f3e">' + s.label + '</div>'
+      + '<div class="text-xs text-gray-400">' + (s.sub || '') + '</div>'
+      + '</div>';
+  }).join('');
 }
 
 function renderChannelFilters() {
-  if(!hasCanalFilter()) return;
-  const canales=['Todos',...uniqueValues(CANAL_COLUMN_INDEX,state.rawData)];
-  const container=document.getElementById('channelFilters'); container.innerHTML='';
-  canales.forEach(canal=>{
-    const count=canal==='Todos'?state.rawData.length:state.rawData.filter(r=>(r[CANAL_COLUMN_INDEX]||'').trim()===canal).length;
-    const btn=document.createElement('button');
-    btn.textContent=`${canal} (${count})`;
-    btn.className=`px-4 py-2 rounded-full text-sm font-medium transition-colors ${state.activeCanal===canal?'filter-btn-active':'filter-btn-inactive'}`;
-    btn.onclick=()=>{ state.activeCanal=canal; Object.values(state.charts).forEach(c=>c.destroy()); state.charts={}; renderStats(); renderChannelFilters(); renderCharts(); };
+  if (!hasCanalFilter()) return;
+  const canales = ['Todos'].concat(uniqueValues(CANAL_COLUMN_INDEX, state.rawData));
+  const container = document.getElementById('channelFilters');
+  container.innerHTML = '';
+  canales.forEach(function(canal) {
+    const count = canal === 'Todos' ? state.rawData.length : state.rawData.filter(function(r) { return (r[CANAL_COLUMN_INDEX] || '').trim() === canal; }).length;
+    const btn = document.createElement('button');
+    btn.textContent = canal + ' (' + count + ')';
+    btn.className = 'px-4 py-2 rounded-full text-sm font-medium transition-colors ' + (state.activeCanal === canal ? 'filter-btn-active' : 'filter-btn-inactive');
+    btn.onclick = function() {
+      state.activeCanal = canal;
+      Object.values(state.charts).forEach(function(c) { c.destroy(); }); state.charts = {};
+      renderStats(); renderChannelFilters(); renderCharts();
+    };
     container.appendChild(btn);
   });
 }
 
 function renderCharts() {
-  const grid=document.getElementById('chartsGrid'); grid.innerHTML=''; openAnswers={};
-  const filtered=getFilteredData(), canalActivo=hasCanalFilter();
-  const skipCols=new Set([0]); if(canalActivo) skipCols.add(CANAL_COLUMN_INDEX);
-  state.headers.forEach((header,colIdx)=>{
-    if(skipCols.has(colIdx)||!header) return;
-    if(/timestamp|marca temporal/i.test(header)) return;
-    const raw=filtered.map(r=>(r[colIdx]||'').trim()).filter(Boolean);
-    const values=normalizeValues(raw); if(!values.length) return;
-    const freq=countFrequency(values), total=values.length;
-    const sorted=Object.entries(freq).sort((a,b)=>b[1]-a[1]);
-    if(isOpenEnded(values,freq)) renderOpenEndedCard(grid,header,colIdx,values,sorted,total);
-    else if(isScaleQuestion(Object.keys(freq))) renderScaleCard(grid,header,colIdx,freq,total);
-    else renderClosedCard(grid,header,colIdx,sorted,total);
+  const grid = document.getElementById('chartsGrid');
+  grid.innerHTML = ''; openAnswers = {};
+  const filtered = getFilteredData();
+  const canalActivo = hasCanalFilter();
+  const skipCols = new Set([0]);
+  if (canalActivo) skipCols.add(CANAL_COLUMN_INDEX);
+  state.headers.forEach(function(header, colIdx) {
+    if (skipCols.has(colIdx) || !header) return;
+    if (/timestamp|marca temporal/i.test(header)) return;
+    const raw = filtered.map(function(r) { return (r[colIdx] || '').trim(); }).filter(Boolean);
+    const values = normalizeValues(raw);
+    if (!values.length) return;
+    const freq = countFrequency(values);
+    const total = values.length;
+    const sorted = Object.entries(freq).sort(function(a, b) { return b[1] - a[1]; });
+    if (isOpenEnded(values, freq)) renderOpenEndedCard(grid, header, colIdx, values, sorted, total);
+    else if (isScaleQuestion(Object.keys(freq))) renderScaleCard(grid, header, colIdx, freq, total);
+    else renderClosedCard(grid, header, colIdx, sorted, total);
   });
 }
 
-function renderOpenEndedCard(grid,header,colIdx,values,sorted,total) {
-  openAnswers[colIdx]=values;
-  const repeated=sorted.filter(([,c])=>c>1);
-  const unique=sorted.filter(([,c])=>c===1).map(([l])=>l);
-  const preview=[
-    ...repeated.map(([l,c])=>({text:l,count:c,pct:((c/total)*100).toFixed(0),rep:true})),
-    ...unique.slice(0,Math.max(0,5-repeated.length)).map(l=>({text:l,count:1,pct:((1/total)*100).toFixed(0),rep:false})),
-  ].slice(0,5);
-  const card=document.createElement('div');
-  card.className='chart-card bg-white rounded-xl border border-gray-200 p-5';
-  const previewHtml=preview.length
-    ?preview.map(({text,count,pct,rep},i)=>`
-      <div class="${i<preview.length-1?'pb-2 border-b border-gray-50':''}">
-        <div class="flex justify-between items-start gap-2 mb-1">
-          <span class="text-xs text-gray-700 leading-snug flex-1">${truncateLabel(text,72)}</span>
-          <span class="text-xs flex-shrink-0" style="${rep?'font-weight:600;color:#3e3f3e':'color:#9ca3af'}">${rep?`${count}× · `:''}${pct}%</span>
-        </div>
-        ${rep?`<div class="h-1 rounded-full bg-gray-100"><div class="h-full rounded-full" style="width:${pct}%;background:#dcd5be"></div></div>`:''}`).join('')
-    :`<p class="text-xs text-gray-400 italic">Sin respuestas disponibles.</p>`;
-  card.innerHTML=`
-    <div class="flex items-start justify-between gap-3 mb-3">
-      <div class="flex-1">
-        <span class="inline-block text-xs font-medium px-2 py-0.5 rounded-full mb-1 badge-open">Pregunta abierta</span>
-        <h3 class="text-sm font-semibold text-gray-800 leading-snug">${header}</h3>
-        <p class="text-xs text-gray-400">${total} respuesta${total!==1?'s':''}</p>
-      </div>
-      <button onclick="openModal(${colIdx})" class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors btn-corp">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h10"/></svg>
-        Ver todas
-      </button>
-    </div>
-    <div class="space-y-2">${previewHtml}</div>
-    ${values.length>5?`<p class="text-xs text-gray-400 mt-3 text-center">… y ${values.length-5} respuestas más</p>`:''}";
+function renderOpenEndedCard(grid, header, colIdx, values, sorted, total) {
+  openAnswers[colIdx] = values;
+  const repeated = sorted.filter(function(e) { return e[1] > 1; });
+  const unique = sorted.filter(function(e) { return e[1] === 1; }).map(function(e) { return e[0]; });
+  const preview = repeated.map(function(e) { return { text:e[0], count:e[1], pct:((e[1]/total)*100).toFixed(0), rep:true }; })
+    .concat(unique.slice(0, Math.max(0, 5 - repeated.length)).map(function(l) { return { text:l, count:1, pct:((1/total)*100).toFixed(0), rep:false }; }))
+    .slice(0, 5);
+
+  let previewHtml = '';
+  if (preview.length) {
+    preview.forEach(function(item, i) {
+      previewHtml += '<div class="' + (i < preview.length - 1 ? 'pb-2 border-b border-gray-50' : '') + '">';
+      previewHtml += '<div class="flex justify-between items-start gap-2 mb-1">';
+      previewHtml += '<span class="text-xs text-gray-700 leading-snug flex-1">' + truncateLabel(item.text, 72) + '</span>';
+      previewHtml += '<span class="text-xs flex-shrink-0" style="' + (item.rep ? 'font-weight:600;color:#3e3f3e' : 'color:#9ca3af') + '">' + (item.rep ? item.count + '× · ' : '') + item.pct + '%</span>';
+      previewHtml += '</div>';
+      if (item.rep) previewHtml += '<div class="h-1 rounded-full bg-gray-100"><div class="h-full rounded-full" style="width:' + item.pct + '%;background:#dcd5be"></div></div>';
+      previewHtml += '</div>';
+    });
+  } else {
+    previewHtml = '<p class="text-xs text-gray-400 italic">Sin respuestas disponibles.</p>';
+  }
+
+  const card = document.createElement('div');
+  card.className = 'chart-card bg-white rounded-xl border border-gray-200 p-5';
+  card.innerHTML = '<div class="flex items-start justify-between gap-3 mb-3">'
+    + '<div class="flex-1">'
+    + '<span class="inline-block text-xs font-medium px-2 py-0.5 rounded-full mb-1 badge-open">Pregunta abierta</span>'
+    + '<h3 class="text-sm font-semibold text-gray-800 leading-snug">' + header + '</h3>'
+    + '<p class="text-xs text-gray-400">' + total + ' respuesta' + (total !== 1 ? 's' : '') + '</p>'
+    + '</div>'
+    + '<button onclick="openModal(' + colIdx + ')" class="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors btn-corp">'
+    + '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h10"/></svg>'
+    + 'Ver todas</button>'
+    + '</div>'
+    + '<div class="space-y-2">' + previewHtml + '</div>'
+    + (values.length > 5 ? '<p class="text-xs text-gray-400 mt-3 text-center">… y ' + (values.length - 5) + ' respuestas más</p>' : '');
   grid.appendChild(card);
 }
 
-function renderScaleCard(grid,header,colIdx,freq,total) {
-  const nums=Object.keys(freq).map(Number).sort((a,b)=>a-b);
-  const maxVal=Math.max(...nums),minVal=Math.min(...nums);
-  const allNums=[];
-  Object.entries(freq).forEach(([k,v])=>{for(let i=0;i<v;i++)allNums.push(Number(k));});
-  const avg=(allNums.reduce((s,n)=>s+n,0)/allNums.length).toFixed(2);
-  const ratio=Number(avg)/maxVal;
-  const avgColor=ratio>=0.7?'#3e3f3e':ratio>=0.5?'#d97706':'#dc2626';
-  const canvasId=`chart_${colIdx}`;
-  const card=document.createElement('div');
-  card.className='chart-card bg-white rounded-xl border border-gray-200 p-5';
-  card.innerHTML=`
-    <h3 class="text-sm font-semibold text-gray-800 leading-snug">${header}</h3>
-    <p class="scale-hint">${minVal} = peor valoración &nbsp;·&nbsp; ${maxVal} = mejor valoración</p>
-    <div class="flex items-center gap-3 mt-2 mb-3">
-      <span class="avg-badge" style="color:${avgColor};border:1px solid ${avgColor}30;background:${avgColor}12">⭐ Media: ${avg} / ${maxVal}</span>
-      <span class="text-xs text-gray-400">${total} respuesta${total!==1?'s':''}</span>
-    </div>
-    <div class="relative" style="height:180px"><canvas id="${canvasId}"></canvas></div>
-    <div class="mt-3 space-y-1" id="legend_${colIdx}"></div>`;
+function renderScaleCard(grid, header, colIdx, freq, total) {
+  const nums = Object.keys(freq).map(Number).sort(function(a, b) { return a - b; });
+  const maxVal = Math.max.apply(null, nums), minVal = Math.min.apply(null, nums);
+  const allNums = [];
+  Object.entries(freq).forEach(function(e) { for (let i = 0; i < e[1]; i++) allNums.push(Number(e[0])); });
+  const avg = (allNums.reduce(function(s, n) { return s + n; }, 0) / allNums.length).toFixed(2);
+  const ratio = Number(avg) / maxVal;
+  const avgColor = ratio >= 0.7 ? '#3e3f3e' : ratio >= 0.5 ? '#d97706' : '#dc2626';
+  const canvasId = 'chart_' + colIdx;
+  const card = document.createElement('div');
+  card.className = 'chart-card bg-white rounded-xl border border-gray-200 p-5';
+  card.innerHTML = '<h3 class="text-sm font-semibold text-gray-800 leading-snug">' + header + '</h3>'
+    + '<p class="scale-hint">' + minVal + ' = peor valoración &nbsp;·&nbsp; ' + maxVal + ' = mejor valoración</p>'
+    + '<div class="flex items-center gap-3 mt-2 mb-3">'
+    + '<span class="avg-badge" style="color:' + avgColor + ';border:1px solid ' + avgColor + '30;background:' + avgColor + '12">⭐ Media: ' + avg + ' / ' + maxVal + '</span>'
+    + '<span class="text-xs text-gray-400">' + total + ' respuesta' + (total !== 1 ? 's' : '') + '</span>'
+    + '</div>'
+    + '<div class="relative" style="height:180px"><canvas id="' + canvasId + '"></canvas></div>'
+    + '<div class="mt-3 space-y-1" id="legend_' + colIdx + '"></div>';
   grid.appendChild(card);
-  const legendEl=card.querySelector(`#legend_${colIdx}`);
-  nums.forEach(n=>{
-    const count=freq[String(n)]||0, pct=((count/total)*100).toFixed(1), col=scaleColor(n,minVal,maxVal);
-    const row=document.createElement('div'); row.className='flex items-center gap-2 text-xs';
-    row.innerHTML=`<span class="w-3 h-3 rounded-sm flex-shrink-0" style="background:${col}"></span><span class="text-gray-500 w-4 flex-shrink-0 font-medium">${n}</span><div class="flex-1 h-1.5 rounded-full bg-gray-100"><div class="h-full rounded-full" style="width:${pct}%;background:${col}"></div></div><span class="font-semibold text-gray-700 w-10 text-right">${pct}%</span><span class="text-gray-400 w-10 text-right">(${count})</span>`;
+  const legendEl = card.querySelector('#legend_' + colIdx);
+  nums.forEach(function(n) {
+    const count = freq[String(n)] || 0;
+    const pct = ((count / total) * 100).toFixed(1);
+    const col = scaleColor(n, minVal, maxVal);
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2 text-xs';
+    row.innerHTML = '<span class="w-3 h-3 rounded-sm flex-shrink-0" style="background:' + col + '"></span>'
+      + '<span class="text-gray-500 w-4 flex-shrink-0 font-medium">' + n + '</span>'
+      + '<div class="flex-1 h-1.5 rounded-full bg-gray-100"><div class="h-full rounded-full" style="width:' + pct + '%;background:' + col + '"></div></div>'
+      + '<span class="font-semibold text-gray-700 w-10 text-right">' + pct + '%</span>'
+      + '<span class="text-gray-400 w-10 text-right">(' + count + ')</span>';
     legendEl.appendChild(row);
   });
-  const ctx=document.getElementById(canvasId);
-  state.charts[canvasId]=new Chart(ctx,{
-    type:'bar',
-    data:{labels:nums.map(String),datasets:[{data:nums.map(n=>freq[String(n)]||0),backgroundColor:nums.map(n=>scaleColor(n,minVal,maxVal)),borderRadius:6,borderSkipped:false}]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const v=c.parsed.y;return ` ${((v/total)*100).toFixed(1)}% · ${v} respuesta${v!==1?'s':''}`;}}}},
-      scales:{x:{grid:{display:false},ticks:{font:{size:12,weight:'600'}}},y:{grid:{color:'#f3f4f6'},ticks:{font:{size:10},callback:v=>`${((v/total)*100).toFixed(0)}%`}}}}
+  const ctx = document.getElementById(canvasId);
+  state.charts[canvasId] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: nums.map(String), datasets: [{ data: nums.map(function(n) { return freq[String(n)] || 0; }), backgroundColor: nums.map(function(n) { return scaleColor(n, minVal, maxVal); }), borderRadius: 6, borderSkipped: false }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(c) { const v = c.parsed.y; return ' ' + ((v/total)*100).toFixed(1) + '% · ' + v + ' respuesta' + (v !== 1 ? 's' : ''); } } } },
+      scales: { x: { grid: { display: false }, ticks: { font: { size: 12, weight: '600' } } }, y: { grid: { color: '#f3f4f6' }, ticks: { font: { size: 10 }, callback: function(v) { return ((v/total)*100).toFixed(0) + '%'; } } } }
+    }
   });
 }
 
-function renderClosedCard(grid,header,colIdx,sorted,total) {
-  const useHorizontal=sorted.length>4, canvasId=`chart_${colIdx}`;
-  const card=document.createElement('div');
-  card.className='chart-card bg-white rounded-xl border border-gray-200 p-5';
-  card.innerHTML=`
-    <h3 class="text-sm font-semibold text-gray-800 mb-1 leading-snug">${header}</h3>
-    <p class="text-xs text-gray-400 mb-3">${total} respuesta${total!==1?'s':''}</p>
-    <div class="relative" style="height:${useHorizontal?Math.max(160,sorted.length*34):210}px"><canvas id="${canvasId}"></canvas></div>
-    <div class="mt-3 space-y-1" id="legend_${colIdx}"></div>`;
+function renderClosedCard(grid, header, colIdx, sorted, total) {
+  const useHorizontal = sorted.length > 4;
+  const canvasId = 'chart_' + colIdx;
+  const card = document.createElement('div');
+  card.className = 'chart-card bg-white rounded-xl border border-gray-200 p-5';
+  card.innerHTML = '<h3 class="text-sm font-semibold text-gray-800 mb-1 leading-snug">' + header + '</h3>'
+    + '<p class="text-xs text-gray-400 mb-3">' + total + ' respuesta' + (total !== 1 ? 's' : '') + '</p>'
+    + '<div class="relative" style="height:' + (useHorizontal ? Math.max(160, sorted.length * 34) : 210) + 'px"><canvas id="' + canvasId + '"></canvas></div>'
+    + '<div class="mt-3 space-y-1" id="legend_' + colIdx + '"></div>';
   grid.appendChild(card);
-  const legendEl=card.querySelector(`#legend_${colIdx}`);
-  sorted.forEach(([label,count],i)=>{
-    const pct=((count/total)*100).toFixed(1);
-    const row=document.createElement('div'); row.className='flex items-center justify-between text-xs';
-    row.innerHTML=`<div class="flex items-center gap-2 truncate flex-1 mr-2"><span class="w-3 h-3 rounded-full flex-shrink-0" style="background:${COLORS[i%COLORS.length]}"></span><span class="truncate text-gray-700">${label}</span></div><span class="font-semibold text-gray-900 flex-shrink-0">${pct}%</span>`;
+  const legendEl = card.querySelector('#legend_' + colIdx);
+  sorted.forEach(function(entry, i) {
+    const label = entry[0], count = entry[1];
+    const pct = ((count / total) * 100).toFixed(1);
+    const row = document.createElement('div');
+    row.className = 'flex items-center justify-between text-xs';
+    row.innerHTML = '<div class="flex items-center gap-2 truncate flex-1 mr-2"><span class="w-3 h-3 rounded-full flex-shrink-0" style="background:' + COLORS[i % COLORS.length] + '"></span><span class="truncate text-gray-700">' + label + '</span></div><span class="font-semibold text-gray-900 flex-shrink-0">' + pct + '%</span>';
     legendEl.appendChild(row);
-    const bar=document.createElement('div'); bar.className='h-1.5 rounded-full bg-gray-100 mb-1';
-    bar.innerHTML=`<div class="h-full rounded-full" style="width:${pct}%;background:${COLORS[i%COLORS.length]}"></div>`;
+    const bar = document.createElement('div');
+    bar.className = 'h-1.5 rounded-full bg-gray-100 mb-1';
+    bar.innerHTML = '<div class="h-full rounded-full" style="width:' + pct + '%;background:' + COLORS[i % COLORS.length] + '"></div>';
     legendEl.appendChild(bar);
   });
-  const ctx=document.getElementById(canvasId);
-  const labels=sorted.map(([l])=>truncateLabel(l,35)), data=sorted.map(([,v])=>v), colors=sorted.map((_,i)=>COLORS[i%COLORS.length]);
-  if(sorted.length<=5) {
-    state.charts[canvasId]=new Chart(ctx,{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${((c.parsed/total)*100).toFixed(1)}% (${c.parsed})`}}},cutout:'60%'}});
+  const ctx = document.getElementById(canvasId);
+  const labels = sorted.map(function(e) { return truncateLabel(e[0], 35); });
+  const data = sorted.map(function(e) { return e[1]; });
+  const colors = sorted.map(function(_, i) { return COLORS[i % COLORS.length]; });
+  if (sorted.length <= 5) {
+    state.charts[canvasId] = new Chart(ctx, { type:'doughnut', data:{ labels:labels, datasets:[{ data:data, backgroundColor:colors, borderWidth:2, borderColor:'#fff' }] }, options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:function(c) { return ' ' + c.label + ': ' + ((c.parsed/total)*100).toFixed(1) + '% (' + c.parsed + ')'; } } } }, cutout:'60%' } });
   } else {
-    state.charts[canvasId]=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data,backgroundColor:colors,borderRadius:6,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,indexAxis:useHorizontal?'y':'x',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const v=c.parsed.x??c.parsed.y;return ` ${((v/total)*100).toFixed(1)}% (${v} resp.)`;}}}}  ,scales:{x:{grid:{display:false},ticks:{font:{size:11}}},y:{grid:{color:'#f3f4f6'},ticks:{font:{size:11}}}}}});
+    state.charts[canvasId] = new Chart(ctx, { type:'bar', data:{ labels:labels, datasets:[{ data:data, backgroundColor:colors, borderRadius:6, borderSkipped:false }] }, options:{ responsive:true, maintainAspectRatio:false, indexAxis:useHorizontal?'y':'x', plugins:{ legend:{ display:false }, tooltip:{ callbacks:{ label:function(c) { const v = c.parsed.x !== undefined ? c.parsed.x : c.parsed.y; return ' ' + ((v/total)*100).toFixed(1) + '% (' + v + ' resp.)'; } } } }, scales:{ x:{ grid:{ display:false }, ticks:{ font:{ size:11 } } }, y:{ grid:{ color:'#f3f4f6' }, ticks:{ font:{ size:11 } } } } } });
   }
 }
 
-function scaleColor(value,minVal,maxVal) {
-  const ratio=maxVal===minVal?1:(value-minVal)/(maxVal-minVal);
-  if(ratio<=0.5){const t=ratio*2;return `rgb(${Math.round(226+(220-226)*t)},${Math.round(162+(213-162)*t)},${Math.round(154+(190-154)*t)})`; }
-  else{const t=(ratio-0.5)*2;return `rgb(${Math.round(220+(62-220)*t)},${Math.round(213+(63-213)*t)},${Math.round(190+(62-190)*t)})`; }
+function scaleColor(value, minVal, maxVal) {
+  const ratio = maxVal === minVal ? 1 : (value - minVal) / (maxVal - minVal);
+  if (ratio <= 0.5) { const t = ratio * 2; return 'rgb(' + Math.round(226+(220-226)*t) + ',' + Math.round(162+(213-162)*t) + ',' + Math.round(154+(190-154)*t) + ')'; }
+  else { const t = (ratio - 0.5) * 2; return 'rgb(' + Math.round(220+(62-220)*t) + ',' + Math.round(213+(63-213)*t) + ',' + Math.round(190+(62-190)*t) + ')'; }
 }
-function hasCanalFilter(){const vals=uniqueValues(CANAL_COLUMN_INDEX,state.rawData);if(vals.length<2)return false;return !vals.every(v=>/^\d+(\.\d+)?$/.test(v.trim()));}
-function isOpenEnded(values,freq){const u=Object.keys(freq).length,t=values.length,avg=values.reduce((s,v)=>s+v.length,0)/t;return(u/t>0.6)||avg>30;}
-function uniqueValues(colIdx,rows){return[...new Set(rows.map(r=>(r[colIdx]||'').trim()).filter(Boolean))];}
-function countFrequency(values){return values.reduce((acc,v)=>{acc[v]=(acc[v]||0)+1;return acc;},{});}
-function isScaleQuestion(options){return options.length>1&&options.every(o=>/^\d+$/.test(o.trim()));}
-function truncateLabel(str,max){return str.length>max?str.slice(0,max)+'…':str;}
-function show(id){document.getElementById(id).classList.remove('hidden');}
-function hide(id){document.getElementById(id).classList.add('hidden');}
+function hasCanalFilter() { const vals = uniqueValues(CANAL_COLUMN_INDEX, state.rawData); if (vals.length < 2) return false; return !vals.every(function(v) { return /^\d+(\.\d+)?$/.test(v.trim()); }); }
+function isOpenEnded(values, freq) { const u = Object.keys(freq).length, t = values.length, avg = values.reduce(function(s,v){return s+v.length;},0)/t; return (u/t > 0.6) || avg > 30; }
+function uniqueValues(colIdx, rows) { return Array.from(new Set(rows.map(function(r){return (r[colIdx]||'').trim();}).filter(Boolean))); }
+function countFrequency(values) { return values.reduce(function(acc,v){acc[v]=(acc[v]||0)+1;return acc;},{}); }
+function isScaleQuestion(options) { return options.length > 1 && options.every(function(o){return /^\d+$/.test(o.trim());}); }
+function truncateLabel(str, max) { return str.length > max ? str.slice(0, max) + '…' : str; }
+function show(id) { document.getElementById(id).classList.remove('hidden'); }
+function hide(id) { document.getElementById(id).classList.add('hidden'); }
 </script>
 </body>
 </html>
