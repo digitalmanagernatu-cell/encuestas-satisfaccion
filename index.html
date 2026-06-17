@@ -10,15 +10,6 @@
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     body { font-family:'Inter',sans-serif; }
 
-    /* ── Paleta corporativa ─────────────────────────────────────
-       #3e3f3e  charcoal oscuro (principal)
-       #dad7d1  gris-beige claro
-       #dcd5be  beige cálido (acento)
-       #e2a29a  salmón
-       #e4bca5  melocotón
-       #d3d7c4  verde salvia
-    ─────────────────────────────────────────────────────────── */
-
     .tab-active   { background:#3e3f3e; color:#fff; }
     .tab-inactive { background:#f5f2ea; color:#3e3f3e; }
     .tab-inactive:hover { background:#dcd5be; }
@@ -37,18 +28,12 @@
     @keyframes spin { to { transform:rotate(360deg); } }
 
     .modal-backdrop { background:rgba(0,0,0,.45); }
-
     .scale-hint { font-size:10px; color:#9ca3af; margin-top:2px; }
-
     .avg-badge { display:inline-flex; align-items:center; gap:4px;
                  border-radius:9999px; padding:2px 10px;
                  font-size:12px; font-weight:600; margin-bottom:8px; }
-
-    /* botón "Ver todas" */
     .btn-corp { background:#f5f2ea; border:1px solid #dcd5be; color:#3e3f3e; }
     .btn-corp:hover { background:#dcd5be; }
-
-    /* badge pregunta abierta */
     .badge-open { background:#f5f2ea; color:#3e3f3e; }
   </style>
 </head>
@@ -74,12 +59,20 @@
 <header class="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-30">
   <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
     <div class="flex items-center gap-3">
-      <!-- Logo NATU: hoja grande + hoja pequeña inferior -->
-      <svg viewBox="0 0 55 90" fill="#3e3f3e" class="w-8 h-12 flex-shrink-0" xmlns="http://www.w3.org/2000/svg">
+      <!--
+        Logo NATU: viewBox 0 0 60 100 contiene la hoja grande (hasta ~y=86)
+        y la hoja pequeña inferior (hasta ~y=97). overflow:visible por si acaso.
+      -->
+      <svg
+        viewBox="0 0 60 100"
+        fill="#3e3f3e"
+        style="width:36px;height:60px;flex-shrink:0;overflow:visible"
+        xmlns="http://www.w3.org/2000/svg"
+      >
         <!-- Hoja grande -->
         <path d="M34 2 C42 6 54 24 54 44 C54 63 44 78 32 84 C20 88 10 78 14 60 C18 42 24 16 34 2Z"/>
         <!-- Hoja pequeña inferior -->
-        <path d="M20 78 C10 82 8 90 18 92 C28 94 50 86 46 78 C40 72 30 72 20 78Z"/>
+        <path d="M20 78 C10 82 8 91 18 94 C28 97 50 88 46 79 C40 73 30 73 20 78Z"/>
       </svg>
       <div>
         <h1 class="text-lg font-bold text-gray-900">NATU Laboratorios</h1>
@@ -157,7 +150,6 @@ const CLIENT_BASE = {
   '2026': 9733,
 };
 
-// Fusión de respuestas similares por año
 const MERGE_RULES = {
   '2026': [
     { match: /nuestras marcas/i, canonical: 'Nuestras marcas (SevenKIDS, Vintage...)' },
@@ -167,20 +159,9 @@ const MERGE_RULES = {
 const CANAL_COLUMN_INDEX = 1;
 // ============================================================
 
-// Paleta corporativa para gráficas (opción múltiple)
 const COLORS = [
-  '#3e3f3e', // charcoal
-  '#e2a29a', // salmón
-  '#e4bca5', // melocotón
-  '#d3d7c4', // verde salvia
-  '#dcd5be', // beige cálido
-  '#dad7d1', // beige frío
-  '#b8a898', // beige oscuro
-  '#a8b09e', // salvia oscuro
-  '#c4b4a4', // cobre suave
-  '#e8e0d4', // beige muy claro
-  '#8e9e8a', // salvia profundo
-  '#c8a898', // salmón apagado
+  '#3e3f3e','#e2a29a','#e4bca5','#d3d7c4','#dcd5be',
+  '#dad7d1','#b8a898','#a8b09e','#c4b4a4','#e8e0d4','#8e9e8a','#c8a898',
 ];
 
 let state = { activeYear: YEARS[0], rawData: [], headers: [], activeCanal: 'Todos', charts: {} };
@@ -548,15 +529,12 @@ function renderClosedCard(grid,header,colIdx,sorted,total) {
 }
 
 // ---- HELPERS ----
-// Escala de color corporativa: salmón (malo) → beige (medio) → salvia (bueno)
 function scaleColor(value, minVal, maxVal) {
   const ratio = maxVal===minVal?1:(value-minVal)/(maxVal-minVal);
   if (ratio<=0.5) {
-    // #e2a29a → #dcd5be
     const t=ratio*2;
     return `rgb(${Math.round(226+(220-226)*t)},${Math.round(162+(213-162)*t)},${Math.round(154+(190-154)*t)})`;
   } else {
-    // #dcd5be → #3e3f3e  (beige a charcoal oscuro)
     const t=(ratio-0.5)*2;
     return `rgb(${Math.round(220+(62-220)*t)},${Math.round(213+(63-213)*t)},${Math.round(190+(62-190)*t)})`;
   }
