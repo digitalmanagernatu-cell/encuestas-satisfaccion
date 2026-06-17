@@ -59,31 +59,7 @@
 <header class="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-30">
   <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
     <div class="flex items-center gap-3">
-      <!--
-        Logo NATU Laboratorios.
-        viewBox 0 0 60 104 cubre hoja grande (hasta ~y=83) + hoja pequeña (hasta ~y=102).
-        Paths trazados a mano desde la imagen corporativa.
-      -->
-      <svg
-        viewBox="0 0 60 104"
-        fill="#3e3f3e"
-        style="width:32px;height:56px;flex-shrink:0"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <!-- Hoja grande: punta arriba-derecha, borde derecho convexo,
-             borde izquierdo en S pronunciada -->
-        <path d="M39 1
-          C50 5 58 23 56 42
-          C54 60 42 74 28 82
-          C16 90 4 86 4 76
-          C4 66 12 56 8 48
-          C2 38 20 10 39 1 Z"/>
-        <!-- Hoja pequeña inferior: separada, curva hacia la derecha -->
-        <path d="M18 82
-          C8 86 4 96 14 100
-          C24 104 52 96 52 86
-          C46 79 30 79 18 82 Z"/>
-      </svg>
+      <img src="logo.png" alt="NATU Laboratorios" style="height:48px;width:auto;flex-shrink:0">
       <div>
         <h1 class="text-lg font-bold text-gray-900">NATU Laboratorios</h1>
         <p class="text-xs text-gray-500">Encuestas de Satisfacción</p>
@@ -354,7 +330,7 @@ function renderOpenEndedCard(grid,header,colIdx,values,sorted,total) {
       </button>
     </div>
     <div class="space-y-2">${previewHtml}</div>
-    ${values.length>5?`<p class="text-xs text-gray-400 mt-3 text-center">… y ${values.length-5} respuestas más</p>`:''}`;
+    ${values.length>5?`<p class="text-xs text-gray-400 mt-3 text-center">… y ${values.length-5} respuestas más</p>`:''}";
   grid.appendChild(card);
 }
 
